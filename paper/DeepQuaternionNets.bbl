@@ -71,6 +71,11 @@ Alex Kendall, Matthew Grimes, and Roberto Cipolla.
 \newblock In {\em Proceedings of the IEEE international conference on computer
   vision}, pages 2938--2946, 2015.
 
+\bibitem[KLS17]{kessy2017optimal}
+Agnan Kessy, Alex Lewin, and Korbinian Strimmer.
+\newblock Optimal whitening and decorrelation.
+\newblock {\em The American Statistician}, (just-accepted), 2017.
+
 \bibitem[MINM17]{minemoto2017feed}
 Toshifumi Minemoto, Teijiro Isokawa, Haruhiko Nishimura, and Nobuyuki Matsui.
 \newblock Feed forward neural network with random quaternionic neurons.
@@ -98,6 +103,11 @@ Titouan Parcollet, Mohamed Morchid, Pierre-Michel Bousquet, Richard Dufour,
 \newblock Quaternion neural networks for spoken language understanding.
 \newblock In {\em Spoken Language Technology Workshop (SLT), 2016 IEEE}, pages
   362--368. IEEE, 2016.
+
+\bibitem[PT02]{turner2002}
+Robert Piziak and Danny Turner.
+\newblock The polar form of a quaternion.
+\newblock 2002.
 
 \bibitem[Ris06]{rishiyur2006neural}
 Adityan Rishiyur.

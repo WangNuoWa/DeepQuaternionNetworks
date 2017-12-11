@@ -30,9 +30,6 @@ def quaternion_standardization(input_centred,
         variances_broadcast[0] = K.shape(input_centred)[0]
 
     # We require the covariance matrix's inverse square root. 
-    # YOLO inverse and hope it doesn't blow up
-    # TODO: Find better way
-
     detV = Vrr*Vii*Vjj*Vkk + Vrr*Vij*Vjk*Vik + Vrr*Vik*Vij*Vjk + \
            Vri*Vri*Vjk*Vjk + Vri*Vij*Vrj*Vkk + Vri*Vik*Vjj*Vrk + \
            Vrj*Vri*Vij*Vkk + Vrj*Vii*Vjk*Vrk + Vrj*Vik*Vrk*Vik + \

@@ -45,9 +45,8 @@ Examples of using quaternion values in networks is mostly limited to architectur
 There are some more recent examples of building models that use quaternions represented as real-values. 
 In \cite{parcollet2016quaternion} they used a quaternion multi-layer perceptron (QMLP) for document understanding and \cite{minemoto2017feed} uses a similar approach in processing multi-dimensional signals. 
 
-Building on \cite{trabelsi2017deep} our contribution in this paper is to formulate quaternion batch normalization and quaternion weight initialization.
-With this higher dimensional representation we achieve a new state of the art on MusicNet.
-We also show results of deep quaternion networks on ...
+Building on \cite{trabelsi2017deep} our contribution in this paper is to formulate quaternion convolution, batch normalization, and weight initialization.
+There arises some difficulty over complex batch normalization that we had to overcome as their is no analytic form for our inverse square root matrix.
 
 \section{Motivation and Related Work}
 The ability of quaternions to effectively represent spatial transformations and analyze multi-dimensional signals makes them promising for applications in artificial intelligence.
@@ -147,16 +146,14 @@ Say that the layer has $N$ feature maps such that $N$ is divisible by 4.
 We let the first $N/4$ feature maps represent the real components, the second $N/4$ represent the $i$ imaginary components, the third $N/4$ represent the $j$ imaginary components, and the last $N/4$ represent the $k$ imaginary components.
 
 
-\subsection{Depth and Width in Deep Quaternion Network}
-An example of parameter growth as a function of network depth $L$ is shown in \cite{trabelsi2017deep}. 
-They show that given $N$ units at each layer and a depth $L$, their deep complex network uses $(N/\sqrt{2})^{2L}$ parameters compared to a real-valued network's $N^2$ per layer. 
-We can use the same steps to show that the quaternion network only needs $N^2/4$ neurons at each layer meaning a total parameter count of $(N/2)^{2L}$. 
-This factor of reduction allows one to construct deeper networks on a fixed GPU memory budget.
+\subsection{Quaternion Differentiability}
+In order for the network to perform backpropagation the cost function and activation functions used must be differentiable with respect to the real, $i$, $j$, and $k$ components of each quaternion parameter of the network.
+As the complex chain rule is shown in \cite{trabelsi2017deep}, we provide the quaternion chain rule which can be seen in \ref{a:diff} of the Appendix.
 
 
 \subsection{Quaternion Convolution}
 Convolution in the quaternion domain is done by convolving a quaternion filter matrix $\textbf{W}=\textbf{A}+\textit{i}\textbf{B}+\textit{j}\textbf{C}+\textit{k}\textbf{D}$ by a quaternion vector $\textbf{h}=\textbf{w}+\textit{i}\textbf{x}+\textit{j}\textbf{y}+\textit{k}\textbf{z}$. 
-Performing the convolution by using the disributive property and grouping terms one gets
+Performing the convolution by using the distributive property and grouping terms one gets
 \begin{align}
 \textbf{W}\ast \textbf{h} = &~(\textbf{A}\ast\textbf{w}-\textbf{B}\ast\textbf{x}-\textbf{C}\ast\textbf{y}-\textbf{D}\ast\textbf{z}) + \nonumber \\ 
 &\textit{i}(\textbf{A}\ast\textbf{x}+\textbf{B}\ast\textbf{w}+\textbf{C}\ast\textbf{z}-\textbf{D}\ast\textbf{y}) + \nonumber \\
@@ -199,18 +196,23 @@ An example is shown in Fig.~\ref{f:quatconv}.
 
 
 \subsection{Quaternion Batch-Normalization}
-Batch-normalization \cite{ioffe2015batch} is used by the vast majority of all deep networks to stabilize and speed up training. 
+Batch-normalization \cite{ioffe2015batch} is used by the vast majority of all deep networks to stabilize and speed up training.
+It works by keeping the activations of the network at zero mean and unit variance.
 The original formulation of batch-normalization only works for real-values. 
 Applying batch normalization to complex or hyper-complex numbers is more difficult, one can not simply translate and scale them such that their mean is 0 and their variance is 1.
 This would not give equal variance in the multiple components of a complex or hyper-complex number.
 To overcome this for complex numbers a whitening approach is used \cite{trabelsi2017deep}, which scales the data by the square root of their variances along each of the two principle components.
 We use the same approach, but must whiten 4D vectors.
-This is accomplished by multiplying the \textbf{0}-centered data ($\textbf{x} - \mathbb{E}[\textbf{x}]$) by the inverse square root of the 4~x~4 covariance matrix \textbf{V}:
+
+However, an issue arises in that there is no nice way to calculate the inverse square root of a 4~x~4 matrix.
+It turns out that the square root is not necessary and we can instead use the Cholesky decomposition on our covariance matrix.
+The details of why this works for whitening can be found in \ref{a:whitening} of the Appendix.
+Now our whitening is accomplished by multiplying the \textbf{0}-centered data ($\textbf{x} - \mathbb{E}[\textbf{x}]$) by \textbf{W}:
 \begin{equation}
-\tilde{x} = (\textbf{V})^{-\frac{1}{2}}(\textbf{x} - \mathbb{E}[\textbf{x}])
+\tilde{x} = \textbf{W}(\textbf{x} - \mathbb{E}[\textbf{x}])
 \label{eq:white4d}
 \end{equation}
-where the covariance matrix \textbf{V} is
+where \textbf{W} is one of the matrices from the Cholesky decomposition of $\textbf{V}^{-1}$ where \textbf{V} is the covariance matrix given by:
 \begin{align}
 \textbf{V}
 =&
@@ -230,8 +232,6 @@ where the covariance matrix \textbf{V} is
 \label{eq:V4d}
 \end{align}
 where Cov$(\cdot)$ is the covariance and $\mathscr{R}\{x\}$, $\mathscr{I}\{x\}$, $\mathscr{J}\{x\}$, and $\mathscr{K}\{x\}$ are the real, $i$, $j$, and $k$ components of $\textbf{x}$ respectively.
-
-We use the Cholesky decomposition, which is shown in more detail in the Appendix, to calculate the square root.
 
 Real-valued batch normalization also uses two learned parameters, $\beta$ and $\gamma$. 
 Our shift parameter {\boldmath$\beta$} must shift a quaternion value so it is a quaternion value itself with real, $i$, $j$, and $k$ as learnable components. 
@@ -269,7 +269,7 @@ W = &~|W|e^{(\mbox{cos}\phi_1 \textit{i} + \mbox{cos}\phi_2 \textit{j} + \mbox{c
 = &~\mathscr{R}\{W\} + \mathscr{I}\{W\} + \mathscr{J}\{W\} + \mathscr{K}\{W\}.
 \label{eq:quaternion_weight}
 \end{align}
-where $|W|$ is the magnitude, $\theta$ and $\phi$ are angle arguments, and $\mbox{cos}^2\phi_1 + \mbox{cos}^2\phi_2 + \mbox{cos}^2\phi_3 = 1$.
+where $|W|$ is the magnitude, $\theta$ and $\phi$ are angle arguments, and $\mbox{cos}^2\phi_1 + \mbox{cos}^2\phi_2 + \mbox{cos}^2\phi_3 = 1$ \cite{turner2002}.
 
 Variance is defined as
 \begin{equation}
@@ -346,6 +346,7 @@ The last layers are a global average pooling layer followed by a single fully co
 
 We also followed their training procedure of using the backpropagation algorithm with Stochastic Gradient Descent with Nesterov momentum \cite{nesterov1983method} set at 0.9.
 The norm of the gradients are clipped to 1 and a custom learning rate scheduler is used.
+The learning scheduler is the same used in \cite{trabelsi2017deep} for a direct comparison in performance.
 The learning rate is initially set to 0.01 for the first 10 epochs and then set to 0.1 from epoch 10-100 and then cut the learning rate by a factor of 10 at epochs 120 and 150.
 Table~\ref{t:results} presents our results along side the real and complex valued networks.
 Our quaternion model outperforms the real and complex networks on both datasets on a smaller parameter budget.
@@ -382,6 +383,56 @@ We also thank Fugro for research time on this project.
 
 \clearpage
 \section{Appendix}
+\subsection{The Generalized Quaternion Chain Rule for a Real-Valued Function}\label{a:diff}
+Let $L$ be a real valued loss function and $q$ be a quaternion variable such that $q = a+\textit{i}~b+\textit{j}~c+\textit{k}~d$ where $a,b,c,d \in \mathbb{R}$ then,
+\begin{align}
+\nabla_L(q) &= \frac{\partial L}{\partial q} = \frac{\partial L}{\partial a} + \textit{i}~\frac{\partial L}{\partial b} + \textit{j}~\frac{\partial L}{\partial c} + \textit{k}~\frac{\partial L}{\partial d} \\ \nonumber
+&= \frac{\partial L}{\partial \mathbb{R}(q)} + \textit{i}~\frac{\partial L}{\partial \mathbb{I}(q)} + \textit{j}~\frac{\partial L}{\partial \mathbb{J}(q)} + \textit{k}~\frac{\partial L}{\partial \mathbb{K}(q)} \\ \nonumber
+&= \mathbb{R}(\nabla_L(q)) + \mathbb{I}(\nabla_L(q)) + \mathbb{J}(\nabla_L(q)) + \mathbb{K}(\nabla_L(q)) 
+\label{eq:diff1}
+\end{align}
+Now let $g = m+\textit{i}~n+\textit{j}~o+\textit{k}~p$ be another quaternion variable where $q$ can be expressed in terms of $g$ and $m,n,o,p \in \mathbb{R}$ we then have,
+\begin{align}
+\nabla_L(q) &= \frac{\partial L}{\partial g} = \frac{\partial L}{\partial m} + \textit{i}~\frac{\partial L}{\partial n} + \textit{j}~\frac{\partial L}{\partial o} + \textit{k}~\frac{\partial L}{\partial p} \\ \nonumber
+&= \frac{\partial L}{\partial a}\frac{\partial a}{\partial m} + \frac{\partial L}{\partial b}\frac{\partial b}{\partial m} + \frac{\partial L}{\partial c}\frac{\partial c}{\partial m} + \frac{\partial L}{\partial d}\frac{\partial d}{\partial m} \\ \nonumber
+&~~+ \textit{i}~\left( \frac{\partial L}{\partial a}\frac{\partial a}{\partial n} + \frac{\partial L}{\partial b}\frac{\partial b}{\partial n} + \frac{\partial L}{\partial c}\frac{\partial c}{\partial n} + \frac{\partial L}{\partial d}\frac{\partial d}{\partial n} \right) \\ \nonumber
+&~~+ \textit{j}~\left( \frac{\partial L}{\partial a}\frac{\partial a}{\partial o} + \frac{\partial L}{\partial b}\frac{\partial b}{\partial o} + \frac{\partial L}{\partial c}\frac{\partial c}{\partial o} + \frac{\partial L}{\partial d}\frac{\partial d}{\partial o} \right) \\ \nonumber
+&~~+ \textit{k}~\left( \frac{\partial L}{\partial a}\frac{\partial a}{\partial p} + \frac{\partial L}{\partial b}\frac{\partial b}{\partial p} + \frac{\partial L}{\partial c}\frac{\partial c}{\partial p} + \frac{\partial L}{\partial d}\frac{\partial d}{\partial p} \right) \\ \nonumber
+&= \frac{\partial L}{\partial a} \left( \frac{\partial a}{\partial m} + \textit{i}~\frac{\partial a}{\partial n} + \textit{i}~\frac{\partial a}{\partial o} + \textit{i}~\frac{\partial a}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial b} \left( \frac{\partial b}{\partial m} + \textit{i}~\frac{\partial b}{\partial n} + \textit{i}~\frac{\partial b}{\partial o} + \textit{i}~\frac{\partial b}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial c} \left( \frac{\partial c}{\partial m} + \textit{i}~\frac{\partial c}{\partial n} + \textit{i}~\frac{\partial c}{\partial o} + \textit{i}~\frac{\partial c}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial d} \left( \frac{\partial d}{\partial m} + \textit{i}~\frac{\partial d}{\partial n} + \textit{i}~\frac{\partial d}{\partial o} + \textit{i}~\frac{\partial d}{\partial p} \right) \\ \nonumber
+&= \frac{\partial L}{\partial \mathbb{R}(q)} \left( \frac{\partial a}{\partial m} + \textit{i}~\frac{\partial a}{\partial n} + \textit{i}~\frac{\partial a}{\partial o} + \textit{i}~\frac{\partial a}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial \mathbb{I}(q)} \left( \frac{\partial b}{\partial m} + \textit{i}~\frac{\partial b}{\partial n} + \textit{i}~\frac{\partial b}{\partial o} + \textit{i}~\frac{\partial b}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial \mathbb{J}(q)} \left( \frac{\partial c}{\partial m} + \textit{i}~\frac{\partial c}{\partial n} + \textit{i}~\frac{\partial c}{\partial o} + \textit{i}~\frac{\partial c}{\partial p} \right) \\ \nonumber
+&~~+ \frac{\partial L}{\partial \mathbb{K}(q)} \left( \frac{\partial d}{\partial m} + \textit{i}~\frac{\partial d}{\partial n} + \textit{i}~\frac{\partial d}{\partial o} + \textit{i}~\frac{\partial d}{\partial p} \right) \\ \nonumber
+&= \mathbb{R}(\nabla_L(q)) \left( \frac{\partial a}{\partial m} + \textit{i}~\frac{\partial a}{\partial n} + \textit{i}~\frac{\partial a}{\partial o} + \textit{i}~\frac{\partial a}{\partial p} \right) \\ \nonumber
+&~~+ \mathbb{I}(\nabla_L(q)) \left( \frac{\partial b}{\partial m} + \textit{i}~\frac{\partial b}{\partial n} + \textit{i}~\frac{\partial b}{\partial o} + \textit{i}~\frac{\partial b}{\partial p} \right) \\ \nonumber
+&~~+ \mathbb{J}(\nabla_L(q)) \left( \frac{\partial c}{\partial m} + \textit{i}~\frac{\partial c}{\partial n} + \textit{i}~\frac{\partial c}{\partial o} + \textit{i}~\frac{\partial c}{\partial p} \right) \\ \nonumber
+&~~+ \mathbb{K}(\nabla_L(q)) \left( \frac{\partial d}{\partial m} + \textit{i}~\frac{\partial d}{\partial n} + \textit{i}~\frac{\partial d}{\partial o} + \textit{i}~\frac{\partial d}{\partial p} \right)
+\label{eq:diff2}
+\end{align}
+
+
+\subsection{Whitening a Matrix}\label{a:whitening}
+Let $\textbf{X}$ be an $n$~x~$n$ matrix and $\mbox{cov}(\textbf{X}) = \mathbf{\Sigma}$ is the symmetric covariance matrix of the same size.
+Whitening a matrix linearly decorrelates the input dimensions, meaning that whitening transforms $\textbf{X}$ into $\textbf{Z}$ such that $\mbox{cov}(\textbf{Z}) = \textbf{I}$ where $\textbf{I}$ is the identity matrix \cite{kessy2017optimal}. 
+The matrix $\textbf{Z}$ can be written as:
+\begin{equation}
+\textbf{Z} = \textbf{W}(\textbf{X} - \mu)
+\label{eq:white1}
+\end{equation}
+where $\textbf{W}$ is an $n$~x~$n$ `whitening' matrix. Since $\mbox{cov}(\textbf{Z}) = \textbf{I}$ it follows that:
+\begin{align}
+&\mathbb{E}[\mathbf{Z}\mathbf{Z}^T] = \mathbf{I} \nonumber \\
+&\mathbb{E}[\mathbf{W}(\mathbf{X - \mu})(\mathbf{W}(\mathbf{X} - \mu))^T] = \mathbf{I} \nonumber \\
+&\mathbb{E}[\mathbf{W}(\mathbf{X - \mu})(\mathbf{X} - \mu)^T\mathbf{W}^T] = \mathbf{I} \nonumber \\
+&\mathbf{W}\Sigma\mathbf{W}^T = \mathbf{I} \nonumber \\
+&\mathbf{W}\Sigma\mathbf{W}^T\mathbf{W} = \mathbf{W} \nonumber \\
+&\mathbf{W}^T \mathbf{W} = \mathbf{\Sigma}^{-1} \label{eq:white2}
+\end{align}
+From \eqref{eq:white2} it is clear that the Cholesky decomposition provides a suitable (but not unique) method of finding $\textbf{W}$.
+
 \subsection{Cholesky Decomposition}
 Cholesky decomposition is an efficient way to implement LU decomposition for symmetric matrices, which allows us to find the square root.
 Consider $\textbf{A}\textbf{X} = \textbf{b}$, $\textbf{A}=[a_{ij}]_{n\times n}$, and $a_{ij} = a_{ji}$, then the Cholesky decomposition of $\textbf{A}$ is given by $\textbf{A} = \textbf{L}\textbf{L}'$ where
@@ -395,7 +446,7 @@ Consider $\textbf{A}\textbf{X} = \textbf{b}$, $\textbf{A}=[a_{ij}]_{n\times n}$,
 \end{bmatrix}
 \label{eq:cholesky1}
 \end{equation}
-Let $l{ki}$ be the $k^{th}$ row and $i^{th}$ column entry of $\textbf{L}$, then
+Let $l_{ki}$ be the $k^{th}$ row and $i^{th}$ column entry of $\textbf{L}$, then
 
 \[ 
    l_{ki} = 

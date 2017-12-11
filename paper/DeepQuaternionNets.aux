@@ -34,34 +34,36 @@
 \newlabel{eq:quarternion3}{{3}{3}}
 \citation{trabelsi2017deep}
 \newlabel{eq:m4r}{{4}{4}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Depth and Width in Deep Quaternion Network}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Quaternion Differentiability}{4}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Quaternion Convolution}{4}}
 \newlabel{eq:convolve1}{{5}{4}}
+\newlabel{eq:}{{6}{4}}
 \citation{ioffe2015batch}
 \citation{trabelsi2017deep}
-\newlabel{eq:}{{6}{5}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces An illustration of quaternion convolution.}}{5}}
 \newlabel{f:quatconv}{{1}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Quaternion Batch-Normalization}{5}}
 \citation{glorot2010understanding}
 \citation{he2015delving}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Quaternion Batch-Normalization}{6}}
 \newlabel{eq:white4d}{{7}{6}}
 \newlabel{eq:V4d}{{8}{6}}
 \newlabel{eq:gamma}{{9}{6}}
 \newlabel{eq:qbn}{{10}{6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Quaternion Weight Initialization}{6}}
+\citation{turner2002}
 \citation{glorot2010understanding}
 \citation{he2015delving}
 \citation{nair2010rectified}
 \citation{trabelsi2017deep}
 \citation{he2016deep}
 \citation{trabelsi2017deep}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Quaternion Weight Initialization}{7}}
 \newlabel{eq:quaternion_weight}{{11}{7}}
 \newlabel{eq:variance}{{12}{7}}
 \newlabel{eq:expected}{{13}{7}}
 \newlabel{eq:variance_sigma}{{14}{7}}
 \@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Results}{7}}
 \citation{nesterov1983method}
+\citation{trabelsi2017deep}
 \citation{he2016deep}
 \citation{trabelsi2017deep}
 \citation{he2016deep}
@@ -70,7 +72,7 @@
 \citation{trabelsi2017deep}
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Classification error on CIFAR-10 and CIFAR-100. Note that \cite  {he2016deep} is a 110 layer residual network, \cite  {trabelsi2017deep} is 118 layer complex network with the same design as the prior except additional initial layers to extract complex mappings.}}{8}}
 \newlabel{t:results}{{1}{8}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Conclusions}{9}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Conclusions}{8}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Acknowledgments}{9}}
 \bibdata{bib}
 \bibcite{arjovsky2016unitary}{ASB16}
@@ -84,11 +86,13 @@
 \bibcite{he2016deep}{HZRS16}
 \bibcite{ioffe2015batch}{IS15}
 \bibcite{kendall2015posenet}{KGC15}
+\bibcite{kessy2017optimal}{KLS17}
 \bibcite{minemoto2017feed}{MINM17}
 \bibcite{nesterov1983method}{Nes}
 \bibcite{nair2010rectified}{NH10}
 \bibcite{oppenheim1981importance}{OL81}
 \bibcite{parcollet2016quaternion}{PMB{$^{+}$}16}
+\bibcite{turner2002}{PT02}
 \bibcite{rishiyur2006neural}{Ris06}
 \bibcite{sangwine2000colour}{SE00}
 \bibcite{srivastava2015training}{SGS15}
@@ -96,11 +100,19 @@
 \bibcite{wisdom2016full}{WPH{$^{+}$}16}
 \bibstyle{alpha}
 \@writefile{toc}{\contentsline {section}{\numberline {7}Appendix}{12}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Cholesky Decomposition}{12}}
-\newlabel{eq:cholesky1}{{15}{12}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}4 DOF Independent Normal Distribution}{12}}
-\newlabel{eq:single_dists}{{16}{12}}
-\newlabel{eq:cumdist}{{17}{12}}
-\newlabel{eq:4dsphere}{{18}{12}}
-\newlabel{eq:polarint}{{19}{12}}
-\newlabel{eq:finaldist}{{20}{13}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}The Generalized Quaternion Chain Rule for a Real-Valued Function}{12}}
+\newlabel{a:diff}{{7.1}{12}}
+\citation{kessy2017optimal}
+\newlabel{eq:diff1}{{16}{13}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Whitening a Matrix}{13}}
+\newlabel{a:whitening}{{7.2}{13}}
+\newlabel{eq:white1}{{17}{14}}
+\newlabel{eq:white2}{{18}{14}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Cholesky Decomposition}{14}}
+\newlabel{eq:cholesky1}{{19}{14}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}4 DOF Independent Normal Distribution}{14}}
+\newlabel{eq:single_dists}{{20}{14}}
+\newlabel{eq:cumdist}{{21}{14}}
+\newlabel{eq:4dsphere}{{22}{15}}
+\newlabel{eq:polarint}{{23}{15}}
+\newlabel{eq:finaldist}{{24}{15}}
