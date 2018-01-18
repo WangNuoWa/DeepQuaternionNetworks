@@ -32,7 +32,7 @@ class Chi4Random(object):
         self.inversecdf = pylab.zeros(Nrl)    
         self.inversecdf[0] = self.x[0]
         cdf_idx = 0
-        for n in xrange(1,self.inversecdfbins):
+        for n in range(1,self.inversecdfbins):
             while self.cdf[cdf_idx] < y[n] and cdf_idx < Nrl:
                 cdf_idx += 1
                 self.inversecdf[n] = self.x[cdf_idx-1] + (self.x[cdf_idx] - self.x[cdf_idx-1]) * (y[n] - self.cdf[cdf_idx-1])/(self.cdf[cdf_idx] - self.cdf[cdf_idx-1]) 

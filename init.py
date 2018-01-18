@@ -23,7 +23,7 @@ class QuaternionInit(Initializer):
     # either the He or the Glorot criterion.
     def __init__(self, kernel_size, input_dim,
                  weight_dim, nb_filters=None,
-                 criterion='glorot', seed=None):
+                 criterion='he', seed=None):
 
         # `weight_dim` is used as a parameter for sanity check
         # as we should not pass an integer as kernel_size when
@@ -97,7 +97,7 @@ class QuaternionInit(Initializer):
 
 class SqrtInit(Initializer):
     def __call__(self, shape, dtype=None):
-        return K.constant(1 / K.sqrt(16), shape=shape, dtype=dtype)
+        return K.constant(1 / K.sqrt(4), shape=shape, dtype=dtype)
 
 
 # Aliases:

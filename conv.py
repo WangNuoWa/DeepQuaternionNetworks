@@ -17,7 +17,6 @@ from keras.layers.merge import _Merge
 from keras.layers.recurrent import Recurrent
 from keras.utils import conv_utils
 from keras.models import Model
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 from bn import QuaternionBN as quaternion_normalization
 from bn import sqrt_init
 from init import QuaternionInit

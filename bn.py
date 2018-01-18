@@ -10,10 +10,11 @@ import numpy as np
 from keras.layers import Layer, InputSpec
 from keras import initializers, regularizers, constraints
 import keras.backend as K
+import tensorflow as tf
 
 
 def sqrt_init(shape, dtype=None):
-    value = (1 / K.sqrt(16)) * K.ones(shape)
+    value = (1 / tf.sqrt(16.0)) * K.ones(shape)
     return value
 
 
@@ -83,9 +84,7 @@ def quaternion_standardization(input_centred,
     Wjk = (1.0 / Wjj) * (Ajk - (Wij*Wik + Wrj*Wrk))
     Wkk = (Akk - (Wjk**2.0 + Wik**2.0 + Wrk**2.0))**0.5
 
-    # And we have computed the inverse square root matrix W = sqrt(V)!
     # Normalization. We multiply, x_normalized = W.x.
-
     # The returned result will be a quaternion standardized input
     # where the r, i, j, and k parts are obtained as follows:
     # x_r_normed = Wrr * x_r_cent + Wri * x_i_cent + Wrj * x_j_cent + Wrk * x_k_cent

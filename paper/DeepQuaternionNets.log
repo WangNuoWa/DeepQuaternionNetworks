@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9) (preloaded format=pdflatex 2016.6.6)  10 DEC 2017 20:21
+This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9) (preloaded format=pdflatex 2016.6.6)  6 JAN 2018 14:00
 entering extended mode
 **./DeepQuaternionNets.tex
 (DeepQuaternionNets.tex
@@ -225,22 +225,22 @@ File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 {C:/ProgramData/MiKTeX/2.9/pdftex/config/pdftex.map}] [2] [3] <figures/quatconv.png, id=22, 2091.815pt x 2509.375pt>
 File: figures/quatconv.png Graphic file (type png)
  <use figures/quatconv.png>
-Package pdftex.def Info: figures/quatconv.png used on input line 192.
+Package pdftex.def Info: figures/quatconv.png used on input line 193.
 (pdftex.def)             Requested size: 345.0pt x 413.83757pt.
  [4] [5 <./figures/quatconv.png>]
 
-LaTeX Font Warning: Command \small invalid in math mode on input line 233.
+LaTeX Font Warning: Command \small invalid in math mode on input line 234.
 
 
-LaTeX Font Warning: Command \small invalid in math mode on input line 233.
+LaTeX Font Warning: Command \small invalid in math mode on input line 234.
 
 
-Overfull \hbox (31.37411pt too wide) in paragraph at lines 233--233
+Overfull \hbox (31.37411pt too wide) in paragraph at lines 234--234
 [] 
  []
 
 [6]
-Overfull \hbox (2.52545pt too wide) in paragraph at lines 316--319
+Overfull \hbox (2.52545pt too wide) in paragraph at lines 317--320
 []\OT1/cmr/m/n/10 To fol-low the Glo-rot and Ben-gio [[]] ini-tial-iza-tion we have $[](\OML/cmm/m/it/10 W\OT1/cmr/m/n/1
 0 ) = 2\OML/cmm/m/it/10 =\OT1/cmr/m/n/10 (\OML/cmm/m/it/10 n[] \OT1/cmr/m/n/10 +
  []
@@ -273,7 +273,7 @@ fonts/cm/cmsy7.pfb><C:/Program Files (x86)/MiKTeX 2.9/fonts/type1/public/amsfont
 iKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.pfb><C:/Program Files (x86)/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cm
 ti7.pfb><C:/Program Files (x86)/MiKTeX 2.9/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Program Files (x86)/MiKTeX
  2.9/fonts/type1/public/rsfs/rsfs10.pfb>
-Output written on DeepQuaternionNets.pdf (15 pages, 420597 bytes).
+Output written on DeepQuaternionNets.pdf (15 pages, 420830 bytes).
 PDF statistics:
  142 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)

@@ -18,10 +18,11 @@
 \begin{abstract}
 The field of deep learning has seen significant advancement in recent years.
 However, much of the existing work has been focused on real-valued numbers.
-Recent work has shown that a deep learning system using the complex numbers can be deeper for a set parameter budget compared to its real-valued counterpart.
+Recent work has shown that a deep learning system using the complex numbers can be deeper for a fixed parameter budget compared to its real-valued counterpart.
 In this work, we explore the benefits of generalizing one step further into the hyper-complex numbers, quaternions specifically, and provide the architecture components needed to build deep quaternion networks.
 We go over quaternion convolutions, present a quaternion weight initialization scheme, and present algorithms for quaternion batch-normalization.
-These pieces are tested by end-to-end training on the CIFAR-100 data set to show the improved convergence to a real-valued network.
+To our knowledge the presented weight initialization and batch-normalization are both novel.
+These pieces are tested by end-to-end training on the CIFAR-10 and CIFAR-100 data sets to show the improved convergence to a real-valued network.
 \end{abstract}
 
 
@@ -52,7 +53,7 @@ There arises some difficulty over complex batch normalization that we had to ove
 The ability of quaternions to effectively represent spatial transformations and analyze multi-dimensional signals makes them promising for applications in artificial intelligence.
 
 One common use of quaternions is for representing rotation into a more compact form. 
-PoseNet \cite{kendall2015posenet} used a quaternion as the target output in their model where the goal was to regress the $6-$DOF camera pose from a single RGB image.
+PoseNet \cite{kendall2015posenet} used a quaternion as the target output in their model where the goal was to recover the $6-$DOF camera pose from a single RGB image.
 The ability to encode rotations may make a quaternion network more robust to rotational variance.
 
 Quaternion representation has also been used in signal processing.  
@@ -62,7 +63,7 @@ Quaternions can be represented as a 2~x~2 matrix of complex numbers, which gives
 Bulow and Sommer \cite{bulow2001hypercomplex} used the higher complexity representation of quaternions by extending Gabor's complex signal to a quaternion one which was then used for texture segmentation.
 Another use of quaternion filters is shown in \cite{sangwine2000colour} where they introduce a new class of filter based on convolution with hyper-complex masks, and present three color edge detecting filters.
 These filters rely on a three-space rotation about the grey line of RGB space and when applied to a color image produce an almost greyscale image with color edges where the original image had a sharp change of color.
-A quaternionic extension of feed forward neural network, for processing multi-dimensional signals, is shown in \cite{minemoto2017feed}.
+A quaternionic extension of a feed forward neural network, for processing multi-dimensional signals, is shown in \cite{minemoto2017feed}.
 They expect that quaternion neurons operate on multi-dimensional signals as single entities, rather than real-valued neurons that deal with each element of signals independently.
 A convolutional neural network (CNN) should be able to learn a powerful set of quaternion filters for more impressive tasks.
 
@@ -92,7 +93,7 @@ Quaternions are governed by the following arithmetic:
 i^2=j^2=k^2=ijk=-1
 \label{eq:quarternion2}
 \end{equation}
-which leads to the noncommutative multiplication rules
+which, by enforcing distributivity, leads to the noncommutative multiplication rules
 \begin{equation}
 ij=k,~jk=i,~ki=j,~ji=-k,~kj=-i,~ik=-j
 \label{eq:quarternion3}
@@ -384,6 +385,7 @@ We also thank Fugro for research time on this project.
 \clearpage
 \section{Appendix}
 \subsection{The Generalized Quaternion Chain Rule for a Real-Valued Function}\label{a:diff}
+We start by specifying the Jacobian.
 Let $L$ be a real valued loss function and $q$ be a quaternion variable such that $q = a+\textit{i}~b+\textit{j}~c+\textit{k}~d$ where $a,b,c,d \in \mathbb{R}$ then,
 \begin{align}
 \nabla_L(q) &= \frac{\partial L}{\partial q} = \frac{\partial L}{\partial a} + \textit{i}~\frac{\partial L}{\partial b} + \textit{j}~\frac{\partial L}{\partial c} + \textit{k}~\frac{\partial L}{\partial d} \\ \nonumber
