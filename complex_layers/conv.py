@@ -2,13 +2,8 @@
 # -*- coding: utf-8 -*-
 
 #
-# Authors: Chase Gaudet
-# code based on work by Chiheb Trabelsi
-# on Deep Complex Networks git source
+# Authors: Chiheb Trabelsi
 
-import numpy as np
-import numpy.distutils
-import numpy.distutils.__config__
 from keras import backend as K
 from keras import activations, initializers, regularizers, constraints
 from keras.layers import Lambda, Layer, InputSpec, Convolution1D, Convolution2D, add, multiply, Activation, Input, concatenate
@@ -17,15 +12,37 @@ from keras.layers.merge import _Merge
 from keras.layers.recurrent import Recurrent
 from keras.utils import conv_utils
 from keras.models import Model
-from bn import QuaternionBN as quaternion_normalization
-from bn import sqrt_init
-from init import QuaternionInit
-from norm import LayerNormalization, QuaternionLayerNorm
+import numpy as np
+from .bn import ComplexBN as complex_normalization
+from .bn import sqrt_init
+from .init import ComplexInit, ComplexIndependentFilters
+from .norm import LayerNormalization, ComplexLayerNorm
 
 
-class QuaternionConv(Layer):
-    """Abstract nD quaternion convolution layer.
-    This layer creates a quaternion convolution kernel that is convolved
+
+def sanitizedInitGet(init):
+	if   init in ["sqrt_init"]:
+		return sqrt_init
+	elif init in ["complex", "complex_independent",
+	              "glorot_complex", "he_complex"]:
+		return init
+	else:
+		return initializers.get(init)
+def sanitizedInitSer(init):
+	if init in [sqrt_init]:
+		return "sqrt_init"
+	elif init == "complex" or isinstance(init, ComplexInit):
+		return "complex"
+	elif init == "complex_independent" or isinstance(init, ComplexIndependentFilters):
+		return "complex_independent"
+	else:
+		return initializers.serialize(init)
+
+
+
+class ComplexConv(Layer):
+    """Abstract nD complex convolution layer.
+    This layer creates a complex convolution kernel that is convolved
     with the layer input to produce a tensor of outputs.
     If `use_bias` is True, a bias vector is created and added to the outputs.
     Finally, if `activation` is not `None`,
@@ -34,9 +51,9 @@ class QuaternionConv(Layer):
         rank: An integer, the rank of the convolution,
             e.g. "2" for 2D convolution.
         filters: Integer, the dimensionality of the output space, i.e,
-            the number of quaternion feature maps. It is also the effective number
+            the number of complex feature maps. It is also the effective number
             of feature maps for each of the real and imaginary parts.
-            (i.e. the number of quaternion filters in the convolution)
+            (i.e. the number of complex filters in the convolution)
             The total effective number of filters is 2 x filters.
         kernel_size: An integer or tuple/list of n integers, specifying the
             dimensions of the convolution window.
@@ -63,8 +80,15 @@ class QuaternionConv(Layer):
             If you don't specify anything, no activation is applied
             (ie. "linear" activation: `a(x) = x`).
         use_bias: Boolean, whether the layer uses a bias vector.
-        kernel_initializer: Initializer for the quaternion `kernel` weights matrix.
-            By default it is 'quaternion'. The 'quaternion_independent' 
+        normalize_weight: Boolean, whether the layer normalizes its complex
+            weights before convolving the complex input.
+            The complex normalization performed is similar to the one
+            for the batchnorm. Each of the complex kernels are centred and multiplied by
+            the inverse square root of covariance matrix.
+            Then, a complex multiplication is perfromed as the normalized weights are
+            multiplied by the complex scaling factor gamma.
+        kernel_initializer: Initializer for the complex `kernel` weights matrix.
+            By default it is 'complex'. The 'complex_independent' 
             and the usual initializers could also be used.
             (see keras.initializers and init.py).
         bias_initializer: Initializer for the bias vector
@@ -81,6 +105,8 @@ class QuaternionConv(Layer):
             (see keras.constraints).
         bias_constraint: Constraint function applied to the bias vector
             (see keras.constraints).
+        spectral_parametrization: Whether or not to use a spectral
+            parametrization of the parameters.
     """
 
     def __init__(self, rank,
@@ -92,7 +118,8 @@ class QuaternionConv(Layer):
                  dilation_rate=1,
                  activation=None,
                  use_bias=True,
-                 kernel_initializer='quaternion',
+                 normalize_weight=False,
+                 kernel_initializer='complex',
                  bias_initializer='zeros',
                  gamma_diag_initializer=sqrt_init,
                  gamma_off_initializer='zeros',
@@ -107,9 +134,10 @@ class QuaternionConv(Layer):
                  gamma_off_constraint=None,
                  init_criterion='he',
                  seed=None,
+                 spectral_parametrization=False,
                  epsilon=1e-7,
                  **kwargs):
-        super(QuaternionConv, self).__init__(**kwargs)
+        super(ComplexConv, self).__init__(**kwargs)
         self.rank = rank
         self.filters = filters
         self.kernel_size = conv_utils.normalize_tuple(kernel_size, rank, 'kernel_size')
@@ -119,15 +147,14 @@ class QuaternionConv(Layer):
         self.dilation_rate = conv_utils.normalize_tuple(dilation_rate, rank, 'dilation_rate')
         self.activation = activations.get(activation)
         self.use_bias = use_bias
+        self.normalize_weight = normalize_weight
         self.init_criterion = init_criterion
+        self.spectral_parametrization = spectral_parametrization
         self.epsilon = epsilon
-        if kernel_initializer in ['quaternion', 'quaternion_independent']:
-            self.kernel_initializer = kernel_initializer
-        else:
-            self.kernel_initializer = initializers.get(kernel_initializer)
-        self.bias_initializer = initializers.get(bias_initializer)
-        self.gamma_diag_initializer = initializers.get(gamma_diag_initializer)
-        self.gamma_off_initializer = initializers.get(gamma_off_initializer)
+        self.kernel_initializer = sanitizedInitGet(kernel_initializer)
+        self.bias_initializer = sanitizedInitGet(bias_initializer)
+        self.gamma_diag_initializer = sanitizedInitGet(gamma_diag_initializer)
+        self.gamma_off_initializer = sanitizedInitGet(gamma_off_initializer)
         self.kernel_regularizer = regularizers.get(kernel_regularizer)
         self.bias_regularizer = regularizers.get(bias_regularizer)
         self.gamma_diag_regularizer = regularizers.get(gamma_diag_regularizer)
@@ -152,11 +179,17 @@ class QuaternionConv(Layer):
         if input_shape[channel_axis] is None:
             raise ValueError('The channel dimension of the inputs '
                              'should be defined. Found `None`.')
-        input_dim = input_shape[channel_axis] // 4
+        input_dim = input_shape[channel_axis] // 2
         self.kernel_shape = self.kernel_size + (input_dim , self.filters)
-
-        if self.kernel_initializer in {'quaternion', 'quaternion_independent'}:
-            kls = {'quaternion': QuaternionInit}[self.kernel_initializer]
+        # The kernel shape here is a complex kernel shape:
+        #   nb of complex feature maps = input_dim;
+        #   nb of output complex feature maps = self.filters;
+        #   imaginary kernel size = real kernel size 
+        #                         = self.kernel_size 
+        #                         = complex kernel size
+        if self.kernel_initializer in {'complex', 'complex_independent'}:
+            kls = {'complex':             ComplexInit,
+                   'complex_independent': ComplexIndependentFilters}[self.kernel_initializer]
             kern_init = kls(
                 kernel_size=self.kernel_size,
                 input_dim=input_dim,
@@ -175,8 +208,36 @@ class QuaternionConv(Layer):
             constraint=self.kernel_constraint
         )
 
+        if self.normalize_weight:
+            gamma_shape = (input_dim * self.filters,)
+            self.gamma_rr = self.add_weight(
+                shape=gamma_shape,
+                name='gamma_rr',
+                initializer=self.gamma_diag_initializer,
+                regularizer=self.gamma_diag_regularizer,
+                constraint=self.gamma_diag_constraint
+            )
+            self.gamma_ii = self.add_weight(
+                shape=gamma_shape,
+                name='gamma_ii',
+                initializer=self.gamma_diag_initializer,
+                regularizer=self.gamma_diag_regularizer,
+                constraint=self.gamma_diag_constraint
+            )
+            self.gamma_ri = self.add_weight(
+                shape=gamma_shape,
+                name='gamma_ri',
+                initializer=self.gamma_off_initializer,
+                regularizer=self.gamma_off_regularizer,
+                constraint=self.gamma_off_constraint
+            )
+        else:
+            self.gamma_rr = None
+            self.gamma_ii = None
+            self.gamma_ri = None
+
         if self.use_bias:
-            bias_shape = (4 * self.filters,)
+            bias_shape = (2 * self.filters,)
             self.bias = self.add_weight(
                 bias_shape,
                 initializer=self.bias_initializer,
@@ -190,27 +251,21 @@ class QuaternionConv(Layer):
 
         # Set input spec.
         self.input_spec = InputSpec(ndim=self.rank + 2,
-                                    axes={channel_axis: input_dim * 4})
+                                    axes={channel_axis: input_dim * 2})
         self.built = True
 
     def call(self, inputs):
         channel_axis = 1 if self.data_format == 'channels_first' else -1
-        input_dim    = K.shape(inputs)[channel_axis] // 4
+        input_dim    = K.shape(inputs)[channel_axis] // 2
         if self.rank == 1:
-            f_r   = self.kernel[:, :, :self.filters]
-            f_i   = self.kernel[:, :, self.filters:self.filters*2]
-            f_j   = self.kernel[:, :, self.filters*2:self.filters*3]
-            f_k   = self.kernel[:, :, self.filters*3:]
+            f_real   = self.kernel[:, :, :self.filters]
+            f_imag   = self.kernel[:, :, self.filters:]
         elif self.rank == 2:
-            f_r   = self.kernel[:, :, :, :self.filters]
-            f_i   = self.kernel[:, :, :, self.filters:self.filters*2]
-            f_j   = self.kernel[:, :, :, self.filters*2:self.filters*3]
-            f_k   = self.kernel[:, :, :, self.filters*3:]
+            f_real   = self.kernel[:, :, :, :self.filters]
+            f_imag   = self.kernel[:, :, :, self.filters:]
         elif self.rank == 3:
-            f_r   = self.kernel[:, :, :, :, :self.filters]
-            f_i   = self.kernel[:, :, :, :, self.filters:self.filters*2]
-            f_j   = self.kernel[:, :, :, :, self.filters*2:self.filters*3]
-            f_k   = self.kernel[:, :, :, :, self.filters*3:]
+            f_real   = self.kernel[:, :, :, :, :self.filters]
+            f_imag   = self.kernel[:, :, :, :, self.filters:]
 
         convArgs = {"strides":       self.strides[0]       if self.rank == 1 else self.strides,
                     "padding":       self.padding,
@@ -220,23 +275,58 @@ class QuaternionConv(Layer):
                     2: K.conv2d,
                     3: K.conv3d}[self.rank]
 
-        # Performing quaternion convolution
+        # In case of weight normalization, real and imaginary weights are normalized
 
-        f_r._keras_shape = self.kernel_shape
-        f_i._keras_shape = self.kernel_shape
-        f_j._keras_shape = self.kernel_shape
-        f_k._keras_shape = self.kernel_shape
+        if self.normalize_weight:
+            ker_shape = self.kernel_shape
+            nb_kernels = ker_shape[-2] * ker_shape[-1]
+            kernel_shape_4_norm = (np.prod(self.kernel_size), nb_kernels)
+            reshaped_f_real = K.reshape(f_real, kernel_shape_4_norm)
+            reshaped_f_imag = K.reshape(f_imag, kernel_shape_4_norm)
+            reduction_axes = list(range(2))
+            del reduction_axes[-1]
+            mu_real = K.mean(reshaped_f_real, axis=reduction_axes)
+            mu_imag = K.mean(reshaped_f_imag, axis=reduction_axes)
 
-        cat_kernels_4_r = K.concatenate([f_r, -f_i, -f_j, -f_k], axis=-2)
-        cat_kernels_4_i = K.concatenate([f_i,  f_r, -f_k, f_j], axis=-2)
-        cat_kernels_4_j = K.concatenate([f_j,  f_k, f_r, -f_i], axis=-2)
-        cat_kernels_4_k = K.concatenate([f_k,  -f_j, f_i, f_r], axis=-2)
-        cat_kernels_4_quaternion = K.concatenate([cat_kernels_4_r, cat_kernels_4_i, 
-                                                  cat_kernels_4_j, cat_kernels_4_k], 
-                                                  axis=-1)
-        cat_kernels_4_quaternion._keras_shape = self.kernel_size + (4 * input_dim, 4 * self.filters)
+            broadcast_mu_shape = [1] * 2
+            broadcast_mu_shape[-1] = nb_kernels
+            broadcast_mu_real = K.reshape(mu_real, broadcast_mu_shape)
+            broadcast_mu_imag = K.reshape(mu_imag, broadcast_mu_shape)
+            reshaped_f_real_centred = reshaped_f_real - broadcast_mu_real
+            reshaped_f_imag_centred = reshaped_f_imag - broadcast_mu_imag
+            Vrr = K.mean(reshaped_f_real_centred ** 2, axis=reduction_axes) + self.epsilon
+            Vii = K.mean(reshaped_f_imag_centred ** 2, axis=reduction_axes) + self.epsilon
+            Vri = K.mean(reshaped_f_real_centred * reshaped_f_imag_centred,
+                         axis=reduction_axes) + self.epsilon
+            
+            normalized_weight = complex_normalization(
+                K.concatenate([reshaped_f_real, reshaped_f_imag], axis=-1),
+                Vrr, Vii, Vri,
+                beta = None,
+                gamma_rr = self.gamma_rr,
+                gamma_ri = self.gamma_ri,
+                gamma_ii = self.gamma_ii,
+                scale=True,
+                center=False,
+                axis=-1
+            )
 
-        output = convFunc(inputs, cat_kernels_4_quaternion, **convArgs)
+            normalized_real = normalized_weight[:, :nb_kernels]
+            normalized_imag = normalized_weight[:, nb_kernels:]
+            f_real = K.reshape(normalized_real, self.kernel_shape)
+            f_imag = K.reshape(normalized_imag, self.kernel_shape)
+
+        # Performing complex convolution
+
+        f_real._keras_shape = self.kernel_shape
+        f_imag._keras_shape = self.kernel_shape
+
+        cat_kernels_4_real = K.concatenate([f_real, -f_imag], axis=-2)
+        cat_kernels_4_imag = K.concatenate([f_imag,  f_real], axis=-2)
+        cat_kernels_4_complex = K.concatenate([cat_kernels_4_real, cat_kernels_4_imag], axis=-1)
+        cat_kernels_4_complex._keras_shape = self.kernel_size + (2 * input_dim, 2 * self.filters)
+
+        output = convFunc(inputs, cat_kernels_4_complex, **convArgs)
 
         if self.use_bias:
             output = K.bias_add(
@@ -263,7 +353,7 @@ class QuaternionConv(Layer):
                     dilation=self.dilation_rate[i]
                 )
                 new_space.append(new_dim)
-            return (input_shape[0],) + tuple(new_space) + (4 * self.filters,)
+            return (input_shape[0],) + tuple(new_space) + (2 * self.filters,)
         if self.data_format == 'channels_first':
             space = input_shape[2:]
             new_space = []
@@ -275,13 +365,9 @@ class QuaternionConv(Layer):
                     stride=self.strides[i],
                     dilation=self.dilation_rate[i])
                 new_space.append(new_dim)
-            return (input_shape[0],) + (4 * self.filters,) + tuple(new_space)
+            return (input_shape[0],) + (2 * self.filters,) + tuple(new_space)
 
     def get_config(self):
-        if self.kernel_initializer in {'quaternion', 'quaternion_independent'}:
-            ki = self.kernel_initializer
-        else:
-            ki = initializers.serialize(self.kernel_initializer)
         config = {
             'rank': self.rank,
             'filters': self.filters,
@@ -292,10 +378,11 @@ class QuaternionConv(Layer):
             'dilation_rate': self.dilation_rate,
             'activation': activations.serialize(self.activation),
             'use_bias': self.use_bias,
-            'kernel_initializer': ki,
-            'bias_initializer': initializers.serialize(self.bias_initializer),
-            'gamma_diag_initializer': initializers.serialize(self.gamma_diag_initializer),
-            'gamma_off_initializer': initializers.serialize(self.gamma_off_initializer),
+            'normalize_weight': self.normalize_weight,
+            'kernel_initializer': sanitizedInitSer(self.kernel_initializer),
+            'bias_initializer': sanitizedInitSer(self.bias_initializer),
+            'gamma_diag_initializer': sanitizedInitSer(self.gamma_diag_initializer),
+            'gamma_off_initializer': sanitizedInitSer(self.gamma_off_initializer),
             'kernel_regularizer': regularizers.serialize(self.kernel_regularizer),
             'bias_regularizer': regularizers.serialize(self.bias_regularizer),
             'gamma_diag_regularizer': regularizers.serialize(self.gamma_diag_regularizer),
@@ -306,17 +393,18 @@ class QuaternionConv(Layer):
             'gamma_diag_constraint': constraints.serialize(self.gamma_diag_constraint),
             'gamma_off_constraint': constraints.serialize(self.gamma_off_constraint),
             'init_criterion': self.init_criterion,
+            'spectral_parametrization': self.spectral_parametrization,
         }
-        base_config = super(QuaternionConv, self).get_config()
+        base_config = super(ComplexConv, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class QuaternionConv1D(QuaternionConv):
-    """1D quaternion convolution layer.
-    This layer creates a quaternion convolution kernel that is convolved
-    with a quaternion input layer over a single quaternion spatial (or temporal) dimension
-    to produce a quaternion output tensor.
-    If `use_bias` is True, a bias vector is created and added to the quaternion output.
+class ComplexConv1D(ComplexConv):
+    """1D complex convolution layer.
+    This layer creates a complex convolution kernel that is convolved
+    with a complex input layer over a single complex spatial (or temporal) dimension
+    to produce a complex output tensor.
+    If `use_bias` is True, a bias vector is created and added to the complex output.
     Finally, if `activation` is not `None`,
     it is applied each of the real and imaginary parts of the output.
     When using this layer as the first layer in a model,
@@ -326,9 +414,9 @@ class QuaternionConv1D(QuaternionConv):
     or `(None, 128)` for variable-length sequences of 128-dimensional vectors.
     # Arguments
         filters: Integer, the dimensionality of the output space, i.e,
-            the number of quaternion feature maps. It is also the effective number
+            the number of complex feature maps. It is also the effective number
             of feature maps for each of the real and imaginary parts.
-            (i.e. the number of quaternion filters in the convolution)
+            (i.e. the number of complex filters in the convolution)
             The total effective number of filters is 2 x filters.
         kernel_size: An integer or tuple/list of n integers, specifying the
             dimensions of the convolution window.
@@ -350,8 +438,15 @@ class QuaternionConv1D(QuaternionConv):
             If you don't specify anything, no activation is applied
             (ie. "linear" activation: `a(x) = x`).
         use_bias: Boolean, whether the layer uses a bias vector.
-        kernel_initializer: Initializer for the quaternion `kernel` weights matrix.
-			By default it is 'quaternion'. The 'quaternion_independent' 
+        normalize_weight: Boolean, whether the layer normalizes its complex
+            weights before convolving the complex input.
+            The complex normalization performed is similar to the one
+            for the batchnorm. Each of the complex kernels are centred and multiplied by
+            the inverse square root of covariance matrix.
+            Then, a complex multiplication is perfromed as the normalized weights are
+            multiplied by the complex scaling factor gamma.
+        kernel_initializer: Initializer for the complex `kernel` weights matrix.
+			By default it is 'complex'. The 'complex_independent' 
 			and the usual initializers could also be used.
             (see keras.initializers and init.py).
         bias_initializer: Initializer for the bias vector
@@ -368,6 +463,8 @@ class QuaternionConv1D(QuaternionConv):
             (see keras.constraints).
         bias_constraint: Constraint function applied to the bias vector
             (see keras.constraints).
+        spectral_parametrization: Whether or not to use a spectral
+            parametrization of the parameters.
     # Input shape
         3D tensor with shape: `(batch_size, steps, input_dim)`
     # Output shape
@@ -382,7 +479,7 @@ class QuaternionConv1D(QuaternionConv):
                  dilation_rate=1,
                  activation=None,
                  use_bias=True,
-                 kernel_initializer='quaternion',
+                 kernel_initializer='complex',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
                  bias_regularizer=None,
@@ -391,8 +488,9 @@ class QuaternionConv1D(QuaternionConv):
                  bias_constraint=None,
                  seed=None,
                  init_criterion='he',
+                 spectral_parametrization=False,
                  **kwargs):
-        super(QuaternionConv1D, self).__init__(
+        super(ComplexConv1D, self).__init__(
             rank=1,
             filters=filters,
             kernel_size=kernel_size,
@@ -410,20 +508,21 @@ class QuaternionConv1D(QuaternionConv):
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
             init_criterion=init_criterion,
+            spectral_parametrization=spectral_parametrization,
             **kwargs)
 
     def get_config(self):
-        config = super(QuaternionConv1D, self).get_config()
+        config = super(ComplexConv1D, self).get_config()
         config.pop('rank')
         config.pop('data_format')
         return config
 
 
-class QuaternionConv2D(QuaternionConv):
-    """2D Quaternion convolution layer (e.g. spatial convolution over images).
-    This layer creates a quaternion convolution kernel that is convolved
-    with a quaternion input layer to produce a quaternion output tensor. If `use_bias` 
-    is True, a quaternion bias vector is created and added to the outputs.
+class ComplexConv2D(ComplexConv):
+    """2D Complex convolution layer (e.g. spatial convolution over images).
+    This layer creates a complex convolution kernel that is convolved
+    with a complex input layer to produce a complex output tensor. If `use_bias` 
+    is True, a complex bias vector is created and added to the outputs.
     Finally, if `activation` is not `None`, it is applied to both the
     real and imaginary parts of the output.
     When using this layer as the first layer in a model,
@@ -432,8 +531,8 @@ class QuaternionConv2D(QuaternionConv):
     e.g. `input_shape=(128, 128, 3)` for 128x128 RGB pictures
     in `data_format="channels_last"`.
     # Arguments
-        filters: Integer, the dimensionality of the quaternion output space
-            (i.e, the number quaternion feature maps in the convolution).
+        filters: Integer, the dimensionality of the complex output space
+            (i.e, the number complex feature maps in the convolution).
             The total effective number of filters or feature maps is 2 x filters.
         kernel_size: An integer or tuple/list of 2 integers, specifying the
             width and height of the 2D convolution window.
@@ -467,8 +566,15 @@ class QuaternionConv2D(QuaternionConv):
             If you don't specify anything, no activation is applied
             (ie. "linear" activation: `a(x) = x`).
         use_bias: Boolean, whether the layer uses a bias vector.
-        kernel_initializer: Initializer for the quaternion `kernel` weights matrix.
-			By default it is 'quaternion'. The 'quaternion_independent' 
+        normalize_weight: Boolean, whether the layer normalizes its complex
+            weights before convolving the complex input.
+            The complex normalization performed is similar to the one
+            for the batchnorm. Each of the complex kernels are centred and multiplied by
+            the inverse square root of covariance matrix.
+            Then, a complex multiplication is perfromed as the normalized weights are
+            multiplied by the complex scaling factor gamma.
+        kernel_initializer: Initializer for the complex `kernel` weights matrix.
+			By default it is 'complex'. The 'complex_independent' 
 			and the usual initializers could also be used.
             (see keras.initializers and init.py).
         bias_initializer: Initializer for the bias vector
@@ -485,6 +591,8 @@ class QuaternionConv2D(QuaternionConv):
             (see keras.constraints).
         bias_constraint: Constraint function applied to the bias vector
             (see keras.constraints).
+        spectral_parametrization: Whether or not to use a spectral
+            parametrization of the parameters.
     # Input shape
         4D tensor with shape:
         `(samples, channels, rows, cols)` if data_format='channels_first'
@@ -506,7 +614,7 @@ class QuaternionConv2D(QuaternionConv):
                  dilation_rate=(1, 1),
                  activation=None,
                  use_bias=True,
-                 kernel_initializer='quaternion',
+                 kernel_initializer='complex',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
                  bias_regularizer=None,
@@ -515,8 +623,9 @@ class QuaternionConv2D(QuaternionConv):
                  bias_constraint=None,
                  seed=None,
                  init_criterion='he',
+                 spectral_parametrization=False,
                  **kwargs):
-        super(QuaternionConv2D, self).__init__(
+        super(ComplexConv2D, self).__init__(
             rank=2,
             filters=filters,
             kernel_size=kernel_size,
@@ -534,20 +643,21 @@ class QuaternionConv2D(QuaternionConv):
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
             init_criterion=init_criterion,
+            spectral_parametrization=spectral_parametrization,
             **kwargs)
 
     def get_config(self):
-        config = super(QuaternionConv2D, self).get_config()
+        config = super(ComplexConv2D, self).get_config()
         config.pop('rank')
         return config
 
 
-class QuaternionConv3D(QuaternionConv):
+class ComplexConv3D(ComplexConv):
     """3D convolution layer (e.g. spatial convolution over volumes).
-    This layer creates a quaternion convolution kernel that is convolved
-    with a quaternion layer input to produce a quaternion output tensor.
+    This layer creates a complex convolution kernel that is convolved
+    with a complex layer input to produce a complex output tensor.
     If `use_bias` is True,
-    a quaternion bias vector is created and added to the outputs. Finally, if
+    a complex bias vector is created and added to the outputs. Finally, if
     `activation` is not `None`, it is applied to each of the real and imaginary
     parts of the output.
     When using this layer as the first layer in a model,
@@ -557,8 +667,8 @@ class QuaternionConv3D(QuaternionConv):
     with 3 channels,
     in `data_format="channels_last"`.
     # Arguments
-        filters: Integer, the dimensionality of the quaternion output space
-            (i.e, the number quaternion feature maps in the convolution).
+        filters: Integer, the dimensionality of the complex output space
+            (i.e, the number complex feature maps in the convolution).
             The total effective number of filters or feature maps is 2 x filters.
         kernel_size: An integer or tuple/list of 3 integers, specifying the
             width and height of the 3D convolution window.
@@ -592,8 +702,15 @@ class QuaternionConv3D(QuaternionConv):
             If you don't specify anything, no activation is applied
             (ie. "linear" activation: `a(x) = x`).
         use_bias: Boolean, whether the layer uses a bias vector.
-        kernel_initializer: Initializer for the quaternion `kernel` weights matrix.
-			By default it is 'quaternion'. The 'quaternion_independent' 
+        normalize_weight: Boolean, whether the layer normalizes its complex
+            weights before convolving the complex input.
+            The complex normalization performed is similar to the one
+            for the batchnorm. Each of the complex kernels are centred and multiplied by
+            the inverse square root of covariance matrix.
+            Then, a complex multiplication is perfromed as the normalized weights are
+            multiplied by the complex scaling factor gamma.
+        kernel_initializer: Initializer for the complex `kernel` weights matrix.
+			By default it is 'complex'. The 'complex_independent' 
 			and the usual initializers could also be used.
             (see keras.initializers and init.py).
         bias_initializer: Initializer for the bias vector
@@ -610,6 +727,8 @@ class QuaternionConv3D(QuaternionConv):
             (see keras.constraints).
         bias_constraint: Constraint function applied to the bias vector
             (see keras.constraints).
+        spectral_parametrization: Whether or not to use a spectral
+            parametrization of the parameters.
     # Input shape
         5D tensor with shape:
         `(samples, channels, conv_dim1, conv_dim2, conv_dim3)` if data_format='channels_first'
@@ -631,7 +750,7 @@ class QuaternionConv3D(QuaternionConv):
                  dilation_rate=(1, 1, 1),
                  activation=None,
                  use_bias=True,
-                 kernel_initializer='quaternion',
+                 kernel_initializer='complex',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
                  bias_regularizer=None,
@@ -640,8 +759,9 @@ class QuaternionConv3D(QuaternionConv):
                  bias_constraint=None,
                  seed=None,
                  init_criterion='he',
+                 spectral_parametrization=False,
                  **kwargs):
-        super(QuaternionConv3D, self).__init__(
+        super(ComplexConv3D, self).__init__(
             rank=3,
             filters=filters,
             kernel_size=kernel_size,
@@ -659,10 +779,11 @@ class QuaternionConv3D(QuaternionConv):
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
             init_criterion=init_criterion,
+            spectral_parametrization=spectral_parametrization,
             **kwargs)
 
     def get_config(self):
-        config = super(QuaternionConv3D, self).get_config()
+        config = super(ComplexConv3D, self).get_config()
         config.pop('rank')
         return config
 
@@ -684,7 +805,7 @@ class WeightNorm_Conv(_Conv):
         super(WeightNorm_Conv, self).__init__(**kwargs)
         if self.rank == 1:
             self.data_format = 'channels_last'
-        self.gamma_initializer = initializers.get(gamma_initializer)
+        self.gamma_initializer = sanitizedInitGet(gamma_initializer)
         self.gamma_regularizer = regularizers.get(gamma_regularizer)
         self.gamma_constraint = constraints.get(gamma_constraint)
         self.epsilon = epsilon
@@ -750,7 +871,7 @@ class WeightNorm_Conv(_Conv):
 
     def get_config(self):
         config = {
-            'gamma_initializer': initializers.serialize(self.gamma_initializer),
+            'gamma_initializer': sanitizedInitSer(self.gamma_initializer),
             'gamma_regularizer': regularizers.serialize(self.gamma_regularizer),
             'gamma_constraint': constraints.serialize(self.gamma_constraint),
             'epsilon': self.epsilon
@@ -762,6 +883,6 @@ class WeightNorm_Conv(_Conv):
 
 # Aliases
 
-QuaternionConvolution1D = QuaternionConv1D
-QuaternionConvolution2D = QuaternionConv2D
-QuaternionConvolution3D = QuaternionConv3D
+ComplexConvolution1D = ComplexConv1D
+ComplexConvolution2D = ComplexConv2D
+ComplexConvolution3D = ComplexConv3D

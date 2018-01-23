@@ -2,19 +2,18 @@
 # -*- coding: utf-8 -*-
 
 #
-# Authors: Chase Gaudet
-# code based on work by Chiheb Trabelsi
-# on Deep Complex Networks git source
-#
-# Implementation of Layer Normalization and Quaternion Layer Normalization
+# Authors: Chiheb Trabelsi
 
+#
+# Implementation of Layer Normalization and Complex Layer Normalization
+#
 
 import numpy as np
 from keras.layers import Layer, InputSpec
 from keras import initializers, regularizers, constraints
 import keras.backend as K
-from bn import QuaternionBN as quaternion_normalization
-from bn import sqrt_init 
+from .bn import ComplexBN as complex_normalization
+from .bn import sqrt_init 
 
 def layernorm(x, axis, epsilon, gamma, beta):
     # assert self.built, 'Layer must be built before being called'
@@ -98,7 +97,7 @@ class LayerNormalization(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class QuaternionLayerNorm(Layer):
+class ComplexLayerNorm(Layer):
     def __init__(self,
                  epsilon=1e-4,
                  axis=-1,
@@ -129,7 +128,7 @@ class QuaternionLayerNorm(Layer):
         self.beta_constraint = constraints.get(beta_constraint)
         self.gamma_diag_constraint = constraints.get(gamma_diag_constraint)
         self.gamma_off_constraint = constraints.get(gamma_off_constraint)
-        super(QuaternionLayerNorm, self).__init__(**kwargs)
+        super(ComplexLayerNorm, self).__init__(**kwargs)
 
     def build(self, input_shape):
 
@@ -143,7 +142,7 @@ class QuaternionLayerNorm(Layer):
         self.input_spec = InputSpec(ndim=len(input_shape),
                                     axes={self.axis: dim})
 
-        gamma_shape = (input_shape[self.axis] // 4,)
+        gamma_shape = (input_shape[self.axis] // 2,)
         if self.scale:
             self.gamma_rr = self.add_weight(
                 shape=gamma_shape,
@@ -159,20 +158,6 @@ class QuaternionLayerNorm(Layer):
                 regularizer=self.gamma_diag_regularizer,
                 constraint=self.gamma_diag_constraint
             )
-            self.gamma_jj = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_jj',
-                initializer=self.gamma_diag_initializer,
-                regularizer=self.gamma_diag_regularizer,
-                constraint=self.gamma_diag_constraint
-            )
-            self.gamma_kk = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_kk',
-                initializer=self.gamma_diag_initializer,
-                regularizer=self.gamma_diag_regularizer,
-                constraint=self.gamma_diag_constraint
-            )
             self.gamma_ri = self.add_weight(
                 shape=gamma_shape,
                 name='gamma_ri',
@@ -180,52 +165,10 @@ class QuaternionLayerNorm(Layer):
                 regularizer=self.gamma_off_regularizer,
                 constraint=self.gamma_off_constraint
             )
-            self.gamma_rj = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_rj',
-                initializer=self.gamma_off_initializer,
-                regularizer=self.gamma_off_regularizer,
-                constraint=self.gamma_off_constraint
-            )
-            self.gamma_rk = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_rk',
-                initializer=self.gamma_off_initializer,
-                regularizer=self.gamma_off_regularizer,
-                constraint=self.gamma_off_constraint
-            )
-            self.gamma_ij = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_ij',
-                initializer=self.gamma_off_initializer,
-                regularizer=self.gamma_off_regularizer,
-                constraint=self.gamma_off_constraint
-            )
-            self.gamma_ik = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_ik',
-                initializer=self.gamma_off_initializer,
-                regularizer=self.gamma_off_regularizer,
-                constraint=self.gamma_off_constraint
-            )
-            self.gamma_jk = self.add_weight(
-                shape=gamma_shape,
-                name='gamma_jk',
-                initializer=self.gamma_off_initializer,
-                regularizer=self.gamma_off_regularizer,
-                constraint=self.gamma_off_constraint
-            )
         else:
             self.gamma_rr = None
             self.gamma_ii = None
-            self.gamma_jj = None
-            self.gamma_kk = None
             self.gamma_ri = None
-            self.gamma_rj = None
-            self.gamma_rk = None
-            self.gamma_ij = None
-            self.gamma_ik = None
-            self.gamma_jk = None
 
         if self.center:
             self.beta = self.add_weight(shape=(input_shape[self.axis],),
@@ -244,7 +187,7 @@ class QuaternionLayerNorm(Layer):
         reduction_axes = list(range(ndim))
         del reduction_axes[self.axis]
         del reduction_axes[0]
-        input_dim = input_shape[self.axis] // 4
+        input_dim = input_shape[self.axis] // 2
         mu = K.mean(inputs, axis=reduction_axes)
         broadcast_mu_shape = [1] * ndim
         broadcast_mu_shape[self.axis] = input_shape[self.axis]
@@ -256,41 +199,25 @@ class QuaternionLayerNorm(Layer):
             input_centred = inputs
         centred_squared = input_centred ** 2
         if (self.axis == 1 and ndim != 3) or ndim == 2:
-            centred_squared_r = centred_squared[:, :input_dim]
-            centred_squared_i = centred_squared[:, input_dim:input_dim*2]
-            centred_squared_j = centred_squared[:, input_dim*2:input_dim*3]
-            centred_squared_k = centred_squared[:, input_dim*3:]
-            centred_r = input_centred[:, :input_dim]
-            centred_i = input_centred[:, input_dim:input_dim*2]
-            centred_j = input_centred[:, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, input_dim*3:]
+            centred_squared_real = centred_squared[:, :input_dim]
+            centred_squared_imag = centred_squared[:, input_dim:]
+            centred_real = input_centred[:, :input_dim]
+            centred_imag = input_centred[:, input_dim:]
         elif ndim == 3:
-            centred_squared_r = centred_squared[:, :, :input_dim]
-            centred_squared_i = centred_squared[:, :, input_dim:input_dim*2]
-            centred_squared_j = centred_squared[:, :, input_dim*2:input_dim*3]
-            centred_squared_k = centred_squared[:, :, input_dim*3:]
-            centred_r = input_centred[:, :, :input_dim]
-            centred_i = input_centred[:, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, input_dim*3:]
+            centred_squared_real = centred_squared[:, :, :input_dim]
+            centred_squared_imag = centred_squared[:, :, input_dim:]
+            centred_real = input_centred[:, :, :input_dim]
+            centred_imag = input_centred[:, :, input_dim:]
         elif self.axis == -1 and ndim == 4:
-            centred_squared_r = centred_squared[:, :, :, :input_dim]
-            centred_squared_i = centred_squared[:, :, :, input_dim:input_dim*2]
-            centred_squared_j = centred_squared[:, :, :, input_dim*2:input_dim*3]
-            centred_squared_k = centred_squared[:, :, :, input_dim*3:]
-            centred_r = input_centred[:, :, :, :input_dim]
-            centred_i = input_centred[:, :, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, :, input_dim*3:]
+            centred_squared_real = centred_squared[:, :, :, :input_dim]
+            centred_squared_imag = centred_squared[:, :, :, input_dim:]
+            centred_real = input_centred[:, :, :, :input_dim]
+            centred_imag = input_centred[:, :, :, input_dim:]
         elif self.axis == -1 and ndim == 5:
-            centred_squared_r = centred_squared[:, :, :, :, :input_dim]
-            centred_squared_i = centred_squared[:, :, :, :, input_dim:input_dim*2]
-            centred_squared_j = centred_squared[:, :, :, :, input_dim*2:input_dim*3]
-            centred_squared_k = centred_squared[:, :, :, :, input_dim*3:]
-            centred_r = input_centred[:, :, :, :, :input_dim]
-            centred_i = input_centred[:, :, :, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, :, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, :, :, input_dim*3:]
+            centred_squared_real = centred_squared[:, :, :, :, :input_dim]
+            centred_squared_imag = centred_squared[:, :, :, :, input_dim:]
+            centred_real = input_centred[:, :, :, :, :input_dim]
+            centred_imag = input_centred[:, :, :, :, input_dim:]
         else:
             raise ValueError(
                 'Incorrect Layernorm combination of axis and dimensions. axis should be either 1 or -1. '
@@ -298,70 +225,29 @@ class QuaternionLayerNorm(Layer):
             )
         if self.scale:
             Vrr = K.mean(
-                centred_squared_r,
+                centred_squared_real,
                 axis=reduction_axes
             ) + self.epsilon
             Vii = K.mean(
-                centred_squared_i,
+                centred_squared_imag,
                 axis=reduction_axes
             ) + self.epsilon
-            Vjj = K.mean(
-                centred_squared_j,
-                axis=reduction_axes
-            ) + self.epsilon
-            Vkk = K.mean(
-                centred_squared_k,
-                axis=reduction_axes
-            ) + self.epsilon
+            # Vri contains the real and imaginary covariance for each feature map.
             Vri = K.mean(
-                centred_r * centred_i,
-                axis=reduction_axes,
-            )
-            Vrj = K.mean(
-                centred_r * centred_j,
-                axis=reduction_axes,
-            )
-            Vrk = K.mean(
-                centred_r * centred_k,
-                axis=reduction_axes,
-            )
-            Vij = K.mean(
-                centred_i * centred_j,
-                axis=reduction_axes,
-            )
-            Vik = K.mean(
-                centred_i * centred_k,
-                axis=reduction_axes,
-            )
-            Vjk = K.mean(
-                centred_j * centred_k,
+                centred_real * centred_imag,
                 axis=reduction_axes,
             )
         elif self.center:
             Vrr = None
             Vii = None
-            Vjj = None
-            Vkk = None
             Vri = None
-            Vrj = None
-            Vrk = None
-            Vij = None
-            Vik = None
-            Vkk = None
         else:
             raise ValueError('Error. Both scale and center in batchnorm are set to False.')
 
-        return quaternion_normalization(
-            input_centred, 
-            Vrr, Vri, Vrj, Vrk, Vii, 
-            Vij, Vik, Vjj, Vjk, Vkk,
-            self.beta, 
-            self.gamma_rr, self.gamma_ri, 
-            self.gamma_rj, self.gamma_rk, 
-            self.gamma_ii, self.gamma_ij, 
-            self.gamma_ik, self.gamma_jj, 
-            self.gamma_jk, self.gamma_kk,
-            self.scale, self.center,
+        return complex_normalization(
+            input_centred, Vrr, Vii, Vri,
+            self.beta, self.gamma_rr, self.gamma_ri,
+            self.gamma_ii, self.scale, self.center,
             layernorm=True, axis=self.axis
         )
 
@@ -381,5 +267,5 @@ class QuaternionLayerNorm(Layer):
             'gamma_diag_constraint': constraints.serialize(self.gamma_diag_constraint),
             'gamma_off_constraint': constraints.serialize(self.gamma_off_constraint),
         }
-        base_config = super(QuaternionLayerNorm, self).get_config()
+        base_config = super(ComplexLayerNorm, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

@@ -14,7 +14,7 @@ import tensorflow as tf
 
 
 def sqrt_init(shape, dtype=None):
-    value = (1 / tf.sqrt(16.0)) * K.ones(shape)
+    value = (1 / tf.sqrt(4.0)) * tf.ones(shape)
     return value
 
 
@@ -30,59 +30,17 @@ def quaternion_standardization(input_centred,
     if layernorm:
         variances_broadcast[0] = K.shape(input_centred)[0]
 
-    # We require the covariance matrix's inverse square root. 
-    detV = Vrr*Vii*Vjj*Vkk + Vrr*Vij*Vjk*Vik + Vrr*Vik*Vij*Vjk + \
-           Vri*Vri*Vjk*Vjk + Vri*Vij*Vrj*Vkk + Vri*Vik*Vjj*Vrk + \
-           Vrj*Vri*Vij*Vkk + Vrj*Vii*Vjk*Vrk + Vrj*Vik*Vrk*Vik + \
-           Vrk*Vri*Vjj*Vik + Vrk*Vii*Vrj*Vjk + Vrk*Vij*Vij*Vrk - \
-           Vrr*Vii*Vjk*Vjk - Vrr*Vij*Vij*Vkk - Vrr*Vik*Vjj*Vik - \
-           Vri*Vri*Vjj*Vkk - Vri*Vij*Vjk*Vrk - Vri*Vik*Vrj*Vjk - \
-           Vrj*Vri*Vjk*Vik - Vrj*Vii*Vrj*Vkk - Vrj*Vik*Vij*Vrk - \
-           Vrk*Vri*Vij*Vjk - Vrk*Vii*Vjj*Vrk - Vrk*Vij*Vrj*Vik
-
-
-    b00 = Vii*Vjj*Vkk + Vij*Vjk*Vik + Vik*Vij*Vjk - Vii*Vjk*Vjk - Vij*Vij*Vkk - Vik*Vjj*Vik
-    b01 = Vri*Vjk*Vjk + Vrj*Vij*Vkk + Vrk*Vjj*Vik - Vri*Vjj*Vkk - Vrj*Vjk*Vik - Vrk*Vij*Vjk
-    b02 = Vri*Vij*Vkk + Vrj*Vik*Vik + Vrk*Vii*Vjk - Vri*Vik*Vjk - Vrj*Vii*Vkk - Vrk*Vij*Vik
-    b03 = Vri*Vik*Vjj + Vrj*Vii*Vjk + Vrk*Vij*Vij - Vri*Vij*Vjk - Vrj*Vik*Vij - Vrk*Vii*Vjj
-
-    b10 = Vri*Vjk*Vjk + Vij*Vrj*Vkk + Vik*Vjj*Vrk - Vri*Vjj*Vkk - Vij*Vjk*Vrk - Vik*Vrj*Vjk
-    b11 = Vrr*Vjj*Vkk + Vrj*Vjk*Vrk + Vrk*Vrj*Vjk - Vrr*Vjk*Vjk - Vrj*Vrj*Vkk - Vrk*Vjj*Vrk
-    b12 = Vrr*Vik*Vjk + Vrj*Vri*Vkk + Vrk*Vij*Vrk - Vrr*Vij*Vkk - Vrj*Vik*Vrk - Vrk*Vri*Vjk
-    b13 = Vrr*Vij*Vjk + Vrj*Vik*Vrj + Vrk*Vri*Vjj - Vrr*Vik*Vjj - Vrj*Vri*Vjk - Vrk*Vij*Vrj
-
-    b20 = Vri*Vij*Vkk + Vii*Vjk*Vrk + Vik*Vrj*Vik - Vri*Vjk*Vik - Vii*Vrj*Vkk - Vik*Vij*Vrk
-    b21 = Vrr*Vjk*Vik + Vri*Vrj*Vkk + Vrk*Vij*Vrk - Vrr*Vij*Vkk - Vri*Vjk*Vrk - Vrk*Vrj*Vik
-    b22 = Vrr*Vii*Vkk + Vri*Vik*Vrk + Vrk*Vri*Vik - Vrr*Vik*Vik - Vri*Vri*Vkk - Vrk*Vii*Vrk
-    b23 = Vrr*Vik*Vij + Vri*Vri*Vjk + Vrk*Vii*Vrj - Vrr*Vii*Vjk - Vri*Vik*Vrj - Vrk*Vri*Vij
-
-    b30 = Vri*Vjj*Vik + Vii*Vrj*Vjk + Vij*Vij*Vrk - Vri*Vij*Vjk - Vii*Vjj*Vrk - Vij*Vrj*Vik
-    b31 = Vrr*Vij*Vjk + Vri*Vjj*Vrk + Vrj*Vrj*Vik - Vrr*Vjj*Vik - Vri*Vrj*Vjk - Vrj*Vij*Vrk
-    b32 = Vrr*Vij*Vik + Vri*Vri*Vjk + Vrj*Vii*Vrk - Vrr*Vii*Vjk - Vri*Vij*Vrk - Vrj*Vri*Vik
-    b33 = Vrr*Vii*Vjj + Vri*Vij*Vrj + Vrj*Vri*Vij - Vrr*Vij*Vij - Vri*Vri*Vjj - Vrj*Vii*Vrj
-
-    Arr = b00 / detV
-    Ari = b01 / detV
-    Arj = b02 / detV
-    Ark = b03 / detV
-    Aii = b11 / detV
-    Aij = b12 / detV
-    Aik = b13 / detV
-    Ajj = b22 / detV
-    Ajk = b23 / detV
-    Akk = b33 / detV
-
     # Chokesky decomposition of 4x4 symmetric matrix
-    Wrr = Arr**0.5
-    Wri = (1.0 / Wrr) * (Ari)
-    Wii = (Aii - (Wri**2.0))**0.5
-    Wrj = (1.0 / Wrr) * (Arj)
-    Wij = (1.0 / Wii) * (Aij - (Wri*Wrj))
-    Wjj = (Ajj - (Wij**2.0 + Wrj**2.0))**0.5
-    Wrk = (1.0 / Wrr) * (Ark)
-    Wik = (1.0 / Wii) * (Aik - (Wri*Wrk))
-    Wjk = (1.0 / Wjj) * (Ajk - (Wij*Wik + Wrj*Wrk))
-    Wkk = (Akk - (Wjk**2.0 + Wik**2.0 + Wrk**2.0))**0.5
+    Wrr = tf.sqrt(Vrr)
+    Wri = (1.0 / Wrr) * (Vri)
+    Wii = tf.sqrt((Vii - (Wri*Wri)))
+    Wrj = (1.0 / Wrr) * (Vrj)
+    Wij = (1.0 / Wii) * (Vij - (Wri*Wrj))
+    Wjj = tf.sqrt((Vjj - (Wij*Wij + Wrj*Wrj)))
+    Wrk = (1.0 / Wrr) * (Vrk)
+    Wik = (1.0 / Wii) * (Vik - (Wri*Wrk))
+    Wjk = (1.0 / Wjj) * (Vjk - (Wij*Wik + Wrj*Wrk))
+    Wkk = tf.sqrt((Vkk - (Wjk*Wjk + Wik*Wik + Wrk*Wrk)))
 
     # Normalization. We multiply, x_normalized = W.x.
     # The returned result will be a quaternion standardized input
@@ -103,22 +61,10 @@ def quaternion_standardization(input_centred,
     broadcast_Wjk = K.reshape(Wjk, variances_broadcast)
     broadcast_Wkk = K.reshape(Wkk, variances_broadcast)
 
-    cat_W_1 = K.concatenate([broadcast_Wrr, 
-                             broadcast_Wri, 
-                             broadcast_Wrj, 
-                             broadcast_Wrk], axis=axis)
-    cat_W_2 = K.concatenate([broadcast_Wri, 
-                             broadcast_Wii, 
-                             broadcast_Wij, 
-                             broadcast_Wik], axis=axis)
-    cat_W_3 = K.concatenate([broadcast_Wrj, 
-                             broadcast_Wij, 
-                             broadcast_Wjj, 
-                             broadcast_Wjk], axis=axis)
-    cat_W_4 = K.concatenate([broadcast_Wrk, 
-                             broadcast_Wik, 
-                             broadcast_Wjk, 
-                             broadcast_Wkk], axis=axis)
+    cat_W_1 = K.concatenate([broadcast_Wrr, broadcast_Wri, broadcast_Wrj, broadcast_Wrk], axis=axis)
+    cat_W_2 = K.concatenate([broadcast_Wri, broadcast_Wii, broadcast_Wij, broadcast_Wik], axis=axis)
+    cat_W_3 = K.concatenate([broadcast_Wrj, broadcast_Wij, broadcast_Wjj, broadcast_Wjk], axis=axis)
+    cat_W_4 = K.concatenate([broadcast_Wrk, broadcast_Wik, broadcast_Wjk, broadcast_Wkk], axis=axis)
 
     if (axis == 1 and ndim != 3) or ndim == 2:
         centred_r = input_centred[:, :input_dim]
@@ -236,25 +182,25 @@ def QuaternionBN(input_centred,
                                      broadcast_gamma_kk], axis=axis)
         
         if (axis == 1 and ndim != 3) or ndim == 2:
-            centred_r = input_centred[:, :input_dim]
-            centred_i = input_centred[:, input_dim:input_dim*2]
-            centred_j = input_centred[:, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, input_dim*3:]
+            centred_r = standardized_output[:, :input_dim]
+            centred_i = standardized_output[:, input_dim:input_dim*2]
+            centred_j = standardized_output[:, input_dim*2:input_dim*3]
+            centred_k = standardized_output[:, input_dim*3:]
         elif ndim == 3:
-            centred_r = input_centred[:, :, :input_dim]
-            centred_i = input_centred[:, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, input_dim*3:]
+            centred_r = standardized_output[:, :, :input_dim]
+            centred_i = standardized_output[:, :, input_dim:input_dim*2]
+            centred_j = standardized_output[:, :, input_dim*2:input_dim*3]
+            centred_k = standardized_output[:, :, input_dim*3:]
         elif axis == -1 and ndim == 4:
-            centred_r = input_centred[:, :, :, :input_dim]
-            centred_i = input_centred[:, :, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, :, input_dim*3:]
+            centred_r = standardized_output[:, :, :, :input_dim]
+            centred_i = standardized_output[:, :, :, input_dim:input_dim*2]
+            centred_j = standardized_output[:, :, :, input_dim*2:input_dim*3]
+            centred_k = standardized_output[:, :, :, input_dim*3:]
         elif axis == -1 and ndim == 5:
-            centred_r = input_centred[:, :, :, :, :input_dim]
-            centred_i = input_centred[:, :, :, :, input_dim:input_dim*2]
-            centred_j = input_centred[:, :, :, :, input_dim*2:input_dim*3]
-            centred_k = input_centred[:, :, :, :, input_dim*3:]
+            centred_r = standardized_output[:, :, :, :, :input_dim]
+            centred_i = standardized_output[:, :, :, :, input_dim:input_dim*2]
+            centred_j = standardized_output[:, :, :, :, input_dim*2:input_dim*3]
+            centred_k = standardized_output[:, :, :, :, input_dim*3:]
         else:
             raise ValueError(
                 'Incorrect Batchnorm combination of axis and dimensions. axis should be either 1 or -1. '
@@ -627,7 +573,7 @@ class QuaternionBatchNormalization(Layer):
             Vrk = None
             Vij = None
             Vik = None
-            Vkk = None
+            Vjk = None
         else:
             raise ValueError('Error. Both scale and center in batchnorm are set to False.')
 
@@ -670,11 +616,11 @@ class QuaternionBatchNormalization(Layer):
                     inference_centred = inputs
                 return QuaternionBN(
                     inference_centred, 
-                    self.moving_Vrr, self.moving_Vii, 
-                    self.moving_Vjj, self.moving_Vkk,
-                    self.moving_Vri, self.moving_Vrj,
-                    self.moving_Vrk, self.moving_Vij,
-                    self.moving_Vik, self.moving_Vjk,
+                    self.moving_Vrr, self.moving_Vri, 
+                    self.moving_Vrj, self.moving_Vrk,
+                    self.moving_Vii, self.moving_Vij,
+                    self.moving_Vik, self.moving_Vjj,
+                    self.moving_Vjk, self.moving_Vkk,
                     self.beta, 
                     self.gamma_rr, self.gamma_ri, 
                     self.gamma_rj, self.gamma_rk, 

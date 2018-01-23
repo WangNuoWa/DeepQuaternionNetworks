@@ -2,11 +2,12 @@ import os
 import numpy as np
 import scipy.misc
 from keras.preprocessing.image import ImageDataGenerator
+np.random.seed(31337)
 
 
 def gen_batch(shape, batch_size):
-    image_folder = './data/segmentation/imgs/'
-    mask_folder = './data/segmentation/masks/'
+    image_folder = 'D:/Projects/DeepQuaternionNets/data/segmentation/imgs/'
+    mask_folder = 'D:/Projects/DeepQuaternionNets/data/segmentation/masks/'
 
     # Get list of all images
     image_names = []
@@ -15,11 +16,11 @@ def gen_batch(shape, batch_size):
 
     # Augment object
     idg = ImageDataGenerator(rotation_range=0,
-                             width_shift_range=0.1,
-                             height_shift_range=0.1,
+                             width_shift_range=0.2,
+                             height_shift_range=0.2,
                              shear_range=0,
-                             zoom_range=0.1,
-                             horizontal_flip=False,
+                             zoom_range=0.2,
+                             horizontal_flip=True,
                              vertical_flip=False)
 
     # Batch Loop

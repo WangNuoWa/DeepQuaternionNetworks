@@ -10,7 +10,7 @@ import numpy as np
 import scipy.stats as st
 from random import gauss
 from numpy.random import RandomState
-from dist import Chi4Random
+from .dist import Chi4Random
 import keras.backend as K
 from keras import initializers
 from keras.initializers import Initializer
@@ -71,7 +71,7 @@ class QuaternionInit(Initializer):
         # must make random unit vector for quaternion vector
         def make_rand_vector(dims):
             vec = [gauss(0, 1) for i in range(dims)]
-            mag = sum(x**2 for x in vec) ** .5
+            mag = sum(x**2 for x in vec) ** 0.5
             return [x/mag for x in vec]
 
         u_i = np.zeros(flat_size)
@@ -97,7 +97,7 @@ class QuaternionInit(Initializer):
 
 class SqrtInit(Initializer):
     def __call__(self, shape, dtype=None):
-        return K.constant(1 / K.sqrt(4), shape=shape, dtype=dtype)
+        return K.constant(1 / K.sqrt(16), shape=shape, dtype=dtype)
 
 
 # Aliases:

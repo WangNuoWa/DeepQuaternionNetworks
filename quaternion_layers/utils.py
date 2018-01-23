@@ -2,8 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import keras.backend as K
-from keras.layers import Lambda
+from keras.layers import Lambda, Layer
 
+
+class Params:
+    def __init__(self, dictionary):
+        for k, v in dictionary.items():
+            setattr(self, k, v)
+
+            
 def get_r(x):
     image_format = K.image_data_format()
     ndim = K.ndim(x)
@@ -90,7 +97,26 @@ def getpart_output_shape(input_shape):
 
     return tuple(returned_shape)
 
-GetR = Lambda(get_r, output_shape=getpart_output_shape)
-GetI = Lambda(get_i, output_shape=getpart_output_shape)
-GetJ = Lambda(get_j, output_shape=getpart_output_shape)
-GetK = Lambda(get_k, output_shape=getpart_output_shape)
+class GetR(Layer):
+    def call(self, inputs):
+        return get_r(inputs)
+    def compute_output_shape(self, input_shape):
+        return getpart_output_shape(input_shape)
+
+class GetI(Layer):
+    def call(self, inputs):
+        return get_i(inputs)
+    def compute_output_shape(self, input_shape):
+        return getpart_output_shape(input_shape)
+
+class GetJ(Layer):
+    def call(self, inputs):
+        return get_j(inputs)
+    def compute_output_shape(self, input_shape):
+        return getpart_output_shape(input_shape)
+
+class GetK(Layer):
+    def call(self, inputs):
+        return get_k(inputs)
+    def compute_output_shape(self, input_shape):
+        return getpart_output_shape(input_shape)

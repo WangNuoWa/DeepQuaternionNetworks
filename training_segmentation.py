@@ -9,9 +9,12 @@ import sys
 sys.setrecursionlimit(10000)
 import logging as L
 import numpy as np
-from utils import GetR, GetI, GetJ, GetK
-from conv import QuaternionConv2D
-from bn import QuaternionBatchNormalization
+from complex_layers.utils import GetReal, GetImag
+from complex_layers.conv import ComplexConv2D
+from complex_layers.bn import ComplexBatchNormalization
+from quaternion_layers.utils import Params, GetR, GetI, GetJ, GetK
+from quaternion_layers.conv import QuaternionConv2D
+from quaternion_layers.bn import QuaternionBatchNormalization
 from batch_gen import gen_batch
 import keras
 from keras.callbacks import Callback, ModelCheckpoint, LearningRateScheduler
@@ -25,12 +28,6 @@ from keras.utils.np_utils import to_categorical
 import keras.backend as K
 K.set_image_data_format('channels_first')
 K.set_image_dim_ordering('th')
-
-
-class Params:
-    def __init__(self, dictionary):
-        for k, v in dictionary.items():
-            setattr(self, k, v)
 
 
 # Callbacks:
@@ -87,11 +84,8 @@ def learnVectorBlock(I, featmaps, filter_size, act, bnArgs):
     return O
 
 
-def getResidualBlock(I, mode, filter_size, featmaps, shortcut, convArgs, bnArgs):
+def getResidualBlock(I, mode, filter_size, featmaps, activation, dropout, shortcut, convArgs, bnArgs):
     """Get residual block."""
-    
-    activation = params.act
-    drop_prob = params.dropout
     
     if mode == "real":
         O = BatchNormalization(**bnArgs)(I)
@@ -137,15 +131,15 @@ def getResidualBlock(I, mode, filter_size, featmaps, shortcut, convArgs, bnArgs)
             O = Concatenate(1)([X, O])
         elif mode == "complex":
             X = ComplexConv2D(featmaps, (1, 1), **convArgs)(I)
-            O_real = Concatenate(1)([GetReal(X), GetReal(O)])
-            O_imag = Concatenate(1)([GetImag(X), GetImag(O)])
+            O_real = Concatenate(1)([GetReal()(X), GetReal()(O)])
+            O_imag = Concatenate(1)([GetImag()(X), GetImag()(O)])
             O = Concatenate(1)([O_real, O_imag])
         elif mode == "quaternion":
             X = QuaternionConv2D(featmaps, (1, 1), **convArgs)(I)
-            O_r = Concatenate(1)([GetR(X), GetR(O)])
-            O_i = Concatenate(1)([GetI(X), GetI(O)])
-            O_j = Concatenate(1)([GetJ(X), GetJ(O)])
-            O_k = Concatenate(1)([GetK(X), GetK(O)])
+            O_r = Concatenate(1)([GetR()(X), GetR()(O)])
+            O_i = Concatenate(1)([GetI()(X), GetI()(O)])
+            O_j = Concatenate(1)([GetJ()(X), GetJ()(O)])
+            O_k = Concatenate(1)([GetK()(X), GetK()(O)])
             O = Concatenate(1)([O_r, O_i, O_j, O_k])
 
     return O
@@ -165,7 +159,8 @@ def getModel(params):
     n = params.num_blocks
     sf = params.start_filter
     activation = params.act
-    inputShape = params.input_shape
+    dropout = params.dropout
+    inputShape = (3, 93, 310)
     channelAxis = 1
     filsize = (3, 3)
     convArgs = {
@@ -176,19 +171,23 @@ def getModel(params):
     bnArgs = {
     "axis": channelAxis,
     "momentum": 0.9,
-    "epsilon": 1e-04
+    "epsilon": 1e-04,
+    "scale": False
     }
 
     convArgs.update({"kernel_initializer": params.init})
 
-    #
     # Create the vector channels
     R = Input(shape=inputShape)
 
-    I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    J = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    K = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    O = concatenate([R, I, J, K], axis=channelAxis)
+    if mode != "quaternion":
+        I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        O = concatenate([R, I], axis=channelAxis)
+    else:
+        I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        J = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        K = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        O = concatenate([R, I, J, K], axis=channelAxis)
 
     if mode == "real":
         O = Conv2D(sf, filsize, **convArgs)(O)
@@ -202,26 +201,17 @@ def getModel(params):
     O = Activation(activation)(O)
 
     for i in range(n):
-        O = getResidualBlock(O, mode, filsize, sf, 'regular', convArgs, bnArgs)
+        O = getResidualBlock(O, mode, filsize, sf, activation, dropout, 'regular', convArgs, bnArgs)
 
-    O = getResidualBlock(O, mode, filsize, sf, 'projection', convArgs, bnArgs)
-
-    for i in range(n-1):
-        O = getResidualBlock(O, mode, filsize, sf*2, 'regular', convArgs, bnArgs)
-
-    O = getResidualBlock(O, mode, filsize, sf*2, 'projection', convArgs, bnArgs)
+    O = getResidualBlock(O, mode, filsize, sf, activation, dropout, 'projection', convArgs, bnArgs)
 
     for i in range(n-1):
-        O = getResidualBlock(O, mode, filsize, sf*4, 'regular', convArgs, bnArgs)
+        O = getResidualBlock(O, mode, filsize, sf*2, activation, dropout, 'regular', convArgs, bnArgs)
 
-    # O = QuaternionConv2D(sf, filsize, **convArgs)(O)
-    # O = QuaternionBatchNormalization(**bnArgs)(O)
+    O = getResidualBlock(O, mode, filsize, sf*2, activation, dropout, 'projection', convArgs, bnArgs)
 
-    # O = QuaternionConv2D(sf*2, filsize, **convArgs)(O)
-    # O = QuaternionBatchNormalization(**bnArgs)(O)
-    
-    # O = QuaternionConv2D(sf, filsize, **convArgs)(O)
-    # O = QuaternionBatchNormalization(**bnArgs)(O)
+    for i in range(n-1):
+        O = getResidualBlock(O, mode, filsize, sf*4, activation, dropout, 'regular', convArgs, bnArgs)
 
     # heatmap output
     O = output = Convolution2D(1, 1, activation='sigmoid')(O)
@@ -237,7 +227,7 @@ def getModel(params):
 
 
 def train(params, model):
-    image_shape = params.input_shape
+    image_shape = (3, 93, 310)
     batch_size = params.batch_size
     epochs = params.num_epochs
 
@@ -273,9 +263,8 @@ def train(params, model):
 
 if __name__ == '__main__':
     param_dict = {"mode": "quaternion",
-                  "num_blocks": 2,
+                  "num_blocks": 3,
                   "start_filter": 8,
-                  "input_shape": (3, 93, 310),
                   "dropout": 0,
                   "batch_size": 8,
                   "num_epochs": 200,

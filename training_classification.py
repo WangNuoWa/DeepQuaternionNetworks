@@ -9,9 +9,12 @@ import sys
 sys.setrecursionlimit(10000)
 import logging as L
 import numpy as np
-from utils import GetR, GetI, GetJ, GetK
-from conv import QuaternionConv2D
-from bn import QuaternionBatchNormalization
+from complex_layers.utils import GetReal, GetImag
+from complex_layers.conv import ComplexConv2D
+from complex_layers.bn import ComplexBatchNormalization
+from quaternion_layers.utils import Params, GetR, GetI, GetJ, GetK
+from quaternion_layers.conv import QuaternionConv2D
+from quaternion_layers.bn import QuaternionBatchNormalization
 import keras
 from keras.callbacks import Callback, ModelCheckpoint, LearningRateScheduler
 from keras.datasets import cifar10, cifar100
@@ -24,12 +27,6 @@ from keras.utils.np_utils import to_categorical
 import keras.backend as K
 K.set_image_data_format('channels_first')
 K.set_image_dim_ordering('th')
-
-
-class Params:
-    def __init__(self, dictionary):
-        for k, v in dictionary.items():
-            setattr(self, k, v)
 
 
 # Callbacks:
@@ -242,14 +239,17 @@ def getModel(params):
 
     convArgs.update({"kernel_initializer": params.init})
 
-    #
     # Create the vector channels
     R = Input(shape=inputShape)
 
-    I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    J = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    K = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
-    O = concatenate([R, I, J, K], axis=channelAxis)
+    if mode != "quaternion":
+        I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        O = concatenate([R, I], axis=channelAxis)
+    else:
+        I = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        J = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        K = learnVectorBlock(R, 3, filsize, 'relu', bnArgs)
+        O = concatenate([R, I, J, K], axis=channelAxis)
 
     if mode == "real":
         O = Conv2D(sf, filsize, **convArgs)(O)
