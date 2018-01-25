@@ -1,3 +1,1 @@
-python ../runner.py "segmentation" --mode "quaternion" -bs 8
-
-pause
+python ../runner.py "segmentation" --mode "quaternion"

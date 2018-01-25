@@ -22,7 +22,8 @@ Recent work has shown that a deep learning system using the complex numbers can 
 In this work, we explore the benefits of generalizing one step further into the hyper-complex numbers, quaternions specifically, and provide the architecture components needed to build deep quaternion networks.
 We go over quaternion convolutions, present a quaternion weight initialization scheme, and present algorithms for quaternion batch-normalization.
 To our knowledge the presented weight initialization and batch-normalization are both novel.
-These pieces are tested by end-to-end training on the CIFAR-10 and CIFAR-100 data sets to show the improved convergence to a real-valued network.
+These pieces are tested in a classification model by end-to-end training on the CIFAR-10 and CIFAR-100 data sets and a segmentation model by end-to-end training on the Kitti Road Segmentation data set. 
+The quaternion networks show improved convergence to a real-valued and complex-valued networks, especially on the segmentation task..
 \end{abstract}
 
 
@@ -60,9 +61,13 @@ Quaternion representation has also been used in signal processing.
 The amount of information in the phase of an image has been shown to be sufficient to recover the majority of information encoded in its magnitude by Oppenheim and Lin \cite{oppenheim1981importance}.
 The phase also encodes information such as shapes, edges, and orientations.
 Quaternions can be represented as a 2~x~2 matrix of complex numbers, which gives them a group of phases potentially holding more information compared to a single phase.
+
 Bulow and Sommer \cite{bulow2001hypercomplex} used the higher complexity representation of quaternions by extending Gabor's complex signal to a quaternion one which was then used for texture segmentation.
-Another use of quaternion filters is shown in \cite{sangwine2000colour} where they introduce a new class of filter based on convolution with hyper-complex masks, and present three color edge detecting filters.
+Another use of quaternion filters is shown in \cite{sangwine2000colour} where they introduce a new class of filter based on convolution with hyper-complex masks, and present three color edge detecting filters. 
 These filters rely on a three-space rotation about the grey line of RGB space and when applied to a color image produce an almost greyscale image with color edges where the original image had a sharp change of color.
+More quaternion filter use is shown in \cite{shi2007quaternion} where they show that it is effective in the context of segmenting color images into regions of similar color texture. 
+They state the advantage of using quaternion arithmetic is that a color can be represented and analyzed as a single entity, which we will see holds for quaternion convolution in a convolutional neural network architecture as well in Section \ref{s:qc}.
+
 A quaternionic extension of a feed forward neural network, for processing multi-dimensional signals, is shown in \cite{minemoto2017feed}.
 They expect that quaternion neurons operate on multi-dimensional signals as single entities, rather than real-valued neurons that deal with each element of signals independently.
 A convolutional neural network (CNN) should be able to learn a powerful set of quaternion filters for more impressive tasks.
@@ -152,7 +157,7 @@ In order for the network to perform backpropagation the cost function and activa
 As the complex chain rule is shown in \cite{trabelsi2017deep}, we provide the quaternion chain rule which can be seen in \ref{a:diff} of the Appendix.
 
 
-\subsection{Quaternion Convolution}
+\subsection{Quaternion Convolution}\label{s:qc}
 Convolution in the quaternion domain is done by convolving a quaternion filter matrix $\textbf{W}=\textbf{A}+\textit{i}\textbf{B}+\textit{j}\textbf{C}+\textit{k}\textbf{D}$ by a quaternion vector $\textbf{h}=\textbf{w}+\textit{i}\textbf{x}+\textit{j}\textbf{y}+\textit{k}\textbf{z}$. 
 Performing the convolution by using the distributive property and grouping terms one gets
 \begin{align}
@@ -186,7 +191,7 @@ Using a matrix to represent the components of the convolution we have:
 \end{bmatrix}
 \label{eq:}
 \end{equation}
-An example is shown in Fig.~\ref{f:quatconv}.
+An example is shown in Fig.~\ref{f:quatconv} where one can see how quaternion convolution forces a linear depthwise mixture of the channels. This is similar to a mixture of standard convolution and depthwise separable convolution from \cite{chollet2016xception}. This reuse of filters on every layer and combination may help extract texture information across channels as seen in \cite{shi2007quaternion}.
 
 \begin{figure}[h]
 	\centering

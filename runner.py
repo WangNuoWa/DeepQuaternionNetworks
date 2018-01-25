@@ -12,7 +12,7 @@ import click
 @click.option('--num-blocks', '-nb', default=2, help='number of residual blocks per stage')
 @click.option('--start-filters', '-sf', default=8, help='number of filters in first layer')
 @click.option('--dropout', '-d', default=0, help='dropout percent')
-@click.option('--batch-size', '-bs', default=4, help='batch size')
+@click.option('--batch-size', '-bs', default=8, help='batch size')
 @click.option('--num-epochs', '-e', default=200, help='total number of epochs')
 @click.option('--dataset', '-ds', default='cifar10', help='dataset to train and test on')
 @click.option('--activation', '-act', default='relu', help='activation function to use')

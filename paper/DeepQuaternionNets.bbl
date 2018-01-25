@@ -21,6 +21,11 @@ Thomas B{\"u}low.
 \newblock Universit{\"a}t Kiel. Institut f{\"u}r Informatik und Praktische
   Mathematik, 1999.
 
+\bibitem[Cho16]{chollet2016xception}
+Fran{\c{c}}ois Chollet.
+\newblock Xception: Deep learning with depthwise separable convolutions.
+\newblock {\em arXiv preprint arXiv:1610.02357}, 2016.
+
 \bibitem[CUH15]{clevert2015fast}
 Djork-Arn{\'e} Clevert, Thomas Unterthiner, and Sepp Hochreiter.
 \newblock Fast and accurate deep network learning by exponential linear units
@@ -119,6 +124,11 @@ Stephen~J Sangwine and Todd~A Ell.
 \newblock Colour image filters based on hypercomplex convolution.
 \newblock {\em IEE Proceedings-Vision, Image and Signal Processing},
   147(2):89--93, 2000.
+
+\bibitem[SF07]{shi2007quaternion}
+Lilong Shi and Brian Funt.
+\newblock Quaternion color texture segmentation.
+\newblock {\em Computer Vision and image understanding}, 107(1):88--96, 2007.
 
 \bibitem[SGS15]{srivastava2015training}
 Rupesh~K Srivastava, Klaus Greff, and J{\"u}rgen Schmidhuber.

@@ -90,7 +90,7 @@ def getResidualBlock(I, mode, filter_size, featmaps, activation, dropout, shortc
     if mode == "real":
         O = BatchNormalization(**bnArgs)(I)
     elif mode == "complex":
-        O = ComplexBN(**bnArgs)(I)
+        O = ComplexBatchNormalization(**bnArgs)(I)
     elif mode == "quaternion":
         O = QuaternionBatchNormalization(**bnArgs)(I)
     O = Activation(activation)(O)
@@ -115,7 +115,7 @@ def getResidualBlock(I, mode, filter_size, featmaps, activation, dropout, shortc
         O = Activation(activation)(O)
         O = Conv2D(featmaps, filter_size, **convArgs)(O)
     elif mode == "complex":
-        O = ComplexBN(**bnArgs)(O)
+        O = ComplexBatchNormalization(**bnArgs)(O)
         O = Activation(activation)(O)
         O = ComplexConv2D(featmaps, filter_size, **convArgs)(O)
     elif mode == "quaternion":
@@ -194,7 +194,7 @@ def getModel(params):
         O = BatchNormalization(**bnArgs)(O)
     elif mode == "complex":
         O = ComplexConv2D(sf, filsize, **convArgs)(O)
-        O = ComplexBN(**bnArgs)(O)
+        O = ComplexBatchNormalization(**bnArgs)(O)
     else:
         O = QuaternionConv2D(sf, filsize, **convArgs)(O)
         O = QuaternionBatchNormalization(**bnArgs)(O)
@@ -257,8 +257,8 @@ def train(params, model):
                   validation_data=(Xv,Yv))
         e += 1
 
-    np.save('{}_seg_train_loss.npy'.format(params.mode), trainValHist.train_loss)
-    np.save('{}_seg_val_loss.npy'.format(params.mode), trainValHist.val_loss)
+    np.savetxt('{}_seg_train_loss.txt'.format(params.mode), trainValHist.train_loss)
+    np.savetxt('{}_seg_val_loss.txt'.format(params.mode), trainValHist.val_loss)
 
 
 if __name__ == '__main__':
