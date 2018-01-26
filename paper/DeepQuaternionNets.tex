@@ -21,7 +21,6 @@ However, much of the existing work has been focused on real-valued numbers.
 Recent work has shown that a deep learning system using the complex numbers can be deeper for a fixed parameter budget compared to its real-valued counterpart.
 In this work, we explore the benefits of generalizing one step further into the hyper-complex numbers, quaternions specifically, and provide the architecture components needed to build deep quaternion networks.
 We go over quaternion convolutions, present a quaternion weight initialization scheme, and present algorithms for quaternion batch-normalization.
-To our knowledge the presented weight initialization and batch-normalization are both novel.
 These pieces are tested in a classification model by end-to-end training on the CIFAR-10 and CIFAR-100 data sets and a segmentation model by end-to-end training on the Kitti Road Segmentation data set. 
 The quaternion networks show improved convergence to a real-valued and complex-valued networks, especially on the segmentation task..
 \end{abstract}
@@ -329,7 +328,9 @@ The angle components are initialized using the uniform distribution between $-\p
 
 
 \section{Experimental Results}
-Our experiments only covered image classification using both the CIFAR-10 and CIFAR-100 benchmarks.
+Our experiments covered image classification using both the CIFAR-10 and CIFAR-100 benchmarks and image segmentation using the KITTI Road Estimation benchmark.
+
+\subsection{Classification}
 We use the same architecture as the large model in \cite{trabelsi2017deep}, which is a 110 layer Residual model similar to the one in \cite{he2016deep}.
 There is one difference between the real-valued network and the ones used for both the complex and hyper-complex valued networks.
 Because the datasets are all real-valued the network must learn the imaginary or quaternion components.
@@ -340,7 +341,8 @@ BN \rightarrow ReLU \rightarrow Conv \rightarrow BN \rightarrow ReLU \rightarrow
 
 Since all datasets that we work with are real-valued,
 we present a way to learn their imaginary components to let the rest of the network operate in the
-complex plane. We learn the initial imaginary component of our input by performing the operations
+complex plane. 
+We learn the initial imaginary component of our input by performing the operations
 present within a single real-valued residual block
 
 This means that to maintain the same approximate parameter count the number of convolution kernels for the complex network was increased.
@@ -353,11 +355,11 @@ The last layers are a global average pooling layer followed by a single fully co
 We also followed their training procedure of using the backpropagation algorithm with Stochastic Gradient Descent with Nesterov momentum \cite{nesterov1983method} set at 0.9.
 The norm of the gradients are clipped to 1 and a custom learning rate scheduler is used.
 The learning scheduler is the same used in \cite{trabelsi2017deep} for a direct comparison in performance.
-The learning rate is initially set to 0.01 for the first 10 epochs and then set to 0.1 from epoch 10-100 and then cut the learning rate by a factor of 10 at epochs 120 and 150.
-Table~\ref{t:results} presents our results along side the real and complex valued networks.
+The learning rate is initially set to 0.01 for the first 10 epochs and then set it to 0.1 from epoch 10-100 and then cut it by a factor of 10 at epochs 120 and 150.
+Table~\ref{t:results1} presents our results along side the real and complex valued networks.
 Our quaternion model outperforms the real and complex networks on both datasets on a smaller parameter budget.
 
-\begin{table}
+\begin{table}[h]
 	\centering
 		\begin{tabular}{l c c}
 			\hline
@@ -365,17 +367,45 @@ Our quaternion model outperforms the real and complex networks on both datasets 
 			\hline
 			\cite{he2016deep} & 6.37 & - \\
 			\cite{trabelsi2017deep} Complex & 5.60 & 27.09 \\
-			Quarernion & \textbf{5.44} & \textbf{HOLDER}
+			Quaternion & \textbf{5.44} & \textbf{26.01}
 		\end{tabular}
 	\caption{Classification error on CIFAR-10 and CIFAR-100. Note that \cite{he2016deep} is a 110 layer residual network, \cite{trabelsi2017deep} is 118 layer complex network with the same design as the prior except additional initial layers to extract complex mappings.}
-	\label{t:results}
+	\label{t:results1}
+\end{table}
+
+\subsection{Segmentation}
+For this experiment we used the same model as the above, but cut the number of residual blocks out of the model for memory reasons given that the KITTI data is large color images.
+The 110 layer model has 10, 9, and 9 residual blocks in the 3 stages talked about above, while this model has 2, 1, and 1 and does not perform any strided convolutions.
+This gives a total of 38 layers.
+
+This means that to maintain the same approximate parameter count the number of convolution kernels for the complex network was increased.
+We however did not increase the number of convolution kernels for the quaternion trials so any increase in model performance comes from the quaternion filters and at a lower hardware budget.
+
+The last layer is a $1 \times 1$ convolution with a sigmoid output so we are getting a heatmap prediction the same size as the input.
+The training procedure is also as above, but the learning rate is scheduled differently.
+Here we begin at 0.01 for the first 10 epochs and then set it to 0.1 from epoch 10-50 and then cut it by a factor of 10 at 100 and 150.
+Table~\ref{t:results2} presents our results along side the real and complex valued networks.
+Quaternion outperformed the other two by a larger margin compared to the classification tasks.
+
+\begin{table}[h]
+	\centering
+		\begin{tabular}{l c c}
+			\hline
+			Architecture & KITTI \\
+			\hline
+			Real & 0.747 \\
+			Complex & 0.769 \\
+			Quaternion & \textbf{0.827}
+		\end{tabular}
+	\caption{IOU on KITTI Road Estimation benchmark.}
+	\label{t:results2}
 \end{table}
 
 \section{Conclusions}
 We have extended upon work looking into complex valued networks by exploring quaternion values.
 We presented the building blocks required to build and train deep quaternion networks and used them to test residual architectures on two common image classification benchmarks.
 We show that they have competitive performance by beating both the real and complex valued networks with less parameters.
-Future work will be needed to test quaternion networks for tasks outside of image classification such as semantic segmentation or audio processing.
+Future work will be needed to test quaternion networks for more segmentation datasets and for audio processing tasks.
 
 
 \section{Acknowledgments}

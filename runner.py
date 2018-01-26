@@ -4,7 +4,8 @@ from training_segmentation import train as train_s
 from training_segmentation import getModel as model_s
 from quaternion_layers.utils import Params
 import click
-
+import numpy as np
+np.random.seed(314)
 
 @click.command()
 @click.argument('task')
